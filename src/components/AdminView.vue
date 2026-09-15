@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as echarts from 'echarts';
 import { adminApi, assessmentApi } from '../api/modules';
 
@@ -19,7 +19,7 @@ const editingId = ref(null);
 const scaleForm = ref({ name: '', description: '', applicableScene: '' });
 const editingScaleId = ref(null);
 const questionScaleId = ref(null);
-const questionJson = ref('[]');
+const questionForm = ref([]);
 const saving = ref(false);
 const audits = ref([]);
 const statistics = ref(null);
@@ -30,6 +30,37 @@ const announcementForm = ref({ title: '', content: '' });
 const editingAnnouncementId = ref(null);
 const articleForm = ref({ title: '', summary: '', content: '' });
 const editingArticleId = ref(null);
+const expandedEditorTarget = ref(null);
+
+const expandedEditorTitle = computed(() => {
+  if (expandedEditorTarget.value === 'scaleDescription') {
+    return '编辑量表简介';
+  }
+  if (expandedEditorTarget.value === 'articleContent') {
+    return '编辑文章正文';
+  }
+  return '';
+});
+
+const expandedEditorContent = computed({
+  get() {
+    if (expandedEditorTarget.value === 'scaleDescription') {
+      return scaleForm.value.description;
+    }
+    if (expandedEditorTarget.value === 'articleContent') {
+      return articleForm.value.content;
+    }
+    return '';
+  },
+  set(value) {
+    if (expandedEditorTarget.value === 'scaleDescription') {
+      scaleForm.value.description = value;
+    }
+    if (expandedEditorTarget.value === 'articleContent') {
+      articleForm.value.content = value;
+    }
+  },
+});
 
 async function load() {
   try {
@@ -173,6 +204,35 @@ function editArticle(article) {
   };
 }
 
+function cancelArticleEdit() {
+  editingArticleId.value = null;
+  articleForm.value = { title: '', summary: '', content: '' };
+}
+
+function openExpandedEditor(target) {
+  expandedEditorTarget.value = target;
+}
+
+function closeExpandedEditor() {
+  expandedEditorTarget.value = null;
+}
+
+function formatArticleUpdatedAt(value) {
+  if (!value) {
+    return '-';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
+  const pad = (number) => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} `
+    + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 async function saveArticle() {
   if (!articleForm.value.title.trim() || !articleForm.value.content.trim()) return;
   const saved = editingArticleId.value
@@ -219,37 +279,120 @@ async function deleteAnnouncement(announcement) {
 async function editQuestions(scale) {
   const detail = await assessmentApi.detail(scale.id);
   questionScaleId.value = scale.id;
-  questionJson.value = JSON.stringify(
-    (detail.questions || []).map((question) => ({
+  questionForm.value = (detail.questions || []).map((question, index) => ({
       order: question.questionOrder,
       content: question.content,
+      type: question.type || 'SINGLE',
       options: (question.options || []).map((option) => ({
         label: option.label,
         score: option.score,
       })),
-    })),
-    null,
-    2,
-  );
+    }));
+}
+
+function addQuestion() {
+  questionForm.value.push({
+    order: questionForm.value.length + 1,
+    content: '',
+    type: 'SINGLE',
+    options: [
+      { label: '', score: 0 },
+      { label: '', score: 0 },
+    ],
+  });
+}
+
+function removeQuestion(index) {
+  questionForm.value.splice(index, 1);
+  questionForm.value.forEach((question, questionIndex) => {
+    question.order = questionIndex + 1;
+  });
+}
+
+function changeQuestionType(question) {
+  if (question.type === 'TEXT') {
+    question.options = [];
+    return;
+  }
+
+  if (question.type === 'JUDGE') {
+    question.options = [
+      { label: '正确', score: 1 },
+      { label: '错误', score: 0 },
+    ];
+    return;
+  }
+
+  if (!question.options.length) {
+    question.options = [
+      { label: '', score: 0 },
+      { label: '', score: 0 },
+    ];
+  }
+}
+
+function addOption(question) {
+  if (question.type === 'JUDGE') {
+    return;
+  }
+  question.options.push({ label: '', score: 0 });
+}
+
+function removeOption(question, optionIndex) {
+  if (question.type === 'JUDGE' || question.options.length <= 1) {
+    return;
+  }
+  question.options.splice(optionIndex, 1);
+}
+
+function cancelQuestions() {
+  questionScaleId.value = null;
+  questionForm.value = [];
 }
 
 async function saveQuestions() {
-  let questions;
-  try {
-    questions = JSON.parse(questionJson.value);
-  } catch (parseError) {
-    error.value = '题目 JSON 格式不正确';
+  if (questionForm.value.some((question) => !question.content.trim())) {
+    error.value = '题目内容不能为空';
     return;
   }
+  if (questionForm.value.some((question) => question.type !== 'TEXT'
+      && question.options.every((option) => !option.label.trim()))) {
+    error.value = '选择题至少需要一个有效选项';
+    return;
+  }
+  const questions = questionForm.value.map((question) => ({
+    order: question.order,
+    content: question.content.trim(),
+    type: question.type,
+    options: question.type === 'TEXT'
+      ? []
+      : question.options
+        .filter((option) => option.label.trim())
+        .map((option) => ({
+          label: option.label.trim(),
+          score: Number(option.score) || 0,
+        })),
+  }));
   await adminApi.updateQuestions(questionScaleId.value, questions);
   questionScaleId.value = null;
+  questionForm.value = [];
 }
 
 async function renderOverviewChart() {
   await nextTick();
-  if (props.section !== 'overview' || !overviewChart.value || !statistics.value) {
+  if (props.section !== 'overview') {
+    destroyOverviewChart();
     return;
   }
+
+  if (!overviewChart.value || !statistics.value) {
+    return;
+  }
+
+  if (overviewChartInstance && overviewChartInstance.getDom() !== overviewChart.value) {
+    destroyOverviewChart();
+  }
+
   if (!overviewChartInstance) {
     overviewChartInstance = echarts.init(overviewChart.value);
   }
@@ -287,6 +430,15 @@ function resizeOverviewChart() {
   overviewChartInstance?.resize();
 }
 
+function destroyOverviewChart() {
+  if (!overviewChartInstance) {
+    return;
+  }
+
+  overviewChartInstance.dispose();
+  overviewChartInstance = undefined;
+}
+
 function formatAuditTime(value) {
   if (!value) {
     return '-';
@@ -317,39 +469,92 @@ watch(
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeOverviewChart);
-  overviewChartInstance?.dispose();
-  overviewChartInstance = undefined;
+  destroyOverviewChart();
 });
 </script>
 
 <template>
   <section class="content admin-page">
     <p v-if="error" class="error-banner">{{ error }}</p>
-    <div v-if="props.section === 'scales'" class="admin-section">
-      <h2>测评量表</h2>
-      <form class="admin-form" @submit.prevent="saveScale">
+    <div v-if="props.section === 'scales'" class="admin-section management-section">
+      <div class="management-heading">
+        <div>
+          <h2>测评量表</h2>
+          <p>维护面向用户的心理测评内容和适用场景。</p>
+        </div>
+        <span class="management-count">{{ scales.length }} 个量表</span>
+      </div>
+      <form class="admin-form management-form" @submit.prevent="saveScale">
         <input v-model="scaleForm.name" placeholder="量表名称" />
         <input v-model="scaleForm.applicableScene" placeholder="适用场景" />
-        <textarea v-model="scaleForm.description" placeholder="量表简介" rows="3" />
-        <div>
+        <textarea
+          v-model="scaleForm.description"
+          class="expandable-editor"
+          placeholder="量表简介"
+          rows="3"
+          title="双击打开大窗口编辑"
+          @dblclick="openExpandedEditor('scaleDescription')"
+        />
+        <div class="management-actions">
           <button class="primary-button" type="submit">{{ editingScaleId ? '保存修改' : '新增量表' }}</button>
           <button v-if="editingScaleId" class="text-button" type="button" @click="editingScaleId = null">取消编辑</button>
         </div>
       </form>
       <div v-if="!scales.length" class="empty-state">暂无量表。</div>
-      <article v-for="scale in scales" :key="scale.id" class="admin-row">
-        <span>{{ scale.name }}</span>
-        <span>{{ scale.applicableScene }}</span>
-        <button class="text-button" type="button" @click="editScale(scale)">编辑</button>
-        <button class="text-button" type="button" @click="deleteScale(scale)">删除</button>
-        <button class="text-button" type="button" @click="editQuestions(scale)">维护题目</button>
+      <article v-for="scale in scales" :key="scale.id" class="management-item scale-item">
+        <div class="management-item-copy">
+          <strong>{{ scale.name }}</strong>
+          <span>{{ scale.applicableScene || '未设置适用场景' }}</span>
+          <p>{{ scale.description || '暂无量表简介。' }}</p>
+        </div>
+        <div class="management-actions">
+          <button class="secondary" type="button" @click="editQuestions(scale)">维护题目</button>
+          <button class="text-button" type="button" @click="editScale(scale)">编辑</button>
+          <button class="text-button danger-button" type="button" @click="deleteScale(scale)">删除</button>
+        </div>
       </article>
-      <div v-if="questionScaleId" class="admin-form">
-        <h3>题目与选项</h3>
-        <textarea v-model="questionJson" rows="12" />
-        <div>
+      <div v-if="questionScaleId" class="admin-form management-form question-form">
+        <div class="question-form-heading">
+          <div>
+            <h3>题目与选项</h3>
+            <p>按问卷顺序添加题目，并为选择题配置选项和分值。</p>
+          </div>
+          <button class="secondary" type="button" @click="addQuestion">添加题目</button>
+        </div>
+        <div v-if="!questionForm.length" class="empty-state question-empty">
+          暂无题目，请点击“添加题目”。
+        </div>
+        <article v-for="(question, questionIndex) in questionForm" :key="questionIndex" class="question-editor">
+          <div class="question-editor-head">
+            <strong>第 {{ questionIndex + 1 }} 题</strong>
+            <button class="text-button danger-button" type="button" @click="removeQuestion(questionIndex)">删除题目</button>
+          </div>
+          <input v-model="question.content" maxlength="1000" placeholder="请输入题目内容" />
+          <label class="question-type-field">
+            题目类型
+            <select v-model="question.type" @change="changeQuestionType(question)">
+              <option value="SINGLE">单选题</option>
+              <option value="MULTIPLE">多选题</option>
+              <option value="TEXT">文字题</option>
+              <option value="JUDGE">判断题</option>
+            </select>
+          </label>
+          <div v-if="question.type !== 'TEXT'" class="option-editor">
+            <div class="option-editor-head">
+              <span>选项与分值</span>
+              <button class="text-button" type="button" @click="addOption(question)">添加选项</button>
+            </div>
+            <div v-for="(option, optionIndex) in question.options" :key="optionIndex" class="option-editor-row">
+              <input v-model="option.label" maxlength="500" placeholder="选项内容" />
+              <input v-model.number="option.score" type="number" min="0" placeholder="分值" />
+              <button class="text-button danger-button" type="button" @click="removeOption(question, optionIndex)">删除</button>
+            </div>
+          </div>
+          <p v-else class="question-type-hint">文字题由用户直接填写，不参与自动计分。</p>
+        </article>
+        <div class="management-actions">
           <button class="primary-button" type="button" @click="saveQuestions">保存题目</button>
-          <button class="text-button" type="button" @click="questionScaleId = null">取消</button>
+          <button class="text-button" type="button" @click="cancelQuestions">取消</button>
         </div>
       </div>
     </div>
@@ -401,12 +606,18 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div v-if="props.section === 'announcements'" class="admin-section">
-      <h2>系统公告</h2>
-      <form class="admin-form" @submit.prevent="saveAnnouncement">
+    <div v-if="props.section === 'announcements'" class="admin-section management-section">
+      <div class="management-heading">
+        <div>
+          <h2>系统公告</h2>
+          <p>发布需要向用户公开展示的通知和提醒。</p>
+        </div>
+        <span class="management-count">{{ announcements.length }} 条公告</span>
+      </div>
+      <form class="admin-form management-form" @submit.prevent="saveAnnouncement">
         <input v-model="announcementForm.title" placeholder="公告标题" maxlength="200" />
         <textarea v-model="announcementForm.content" placeholder="公告内容" maxlength="10000" rows="3" />
-        <div>
+        <div class="management-actions">
           <button class="primary-button" type="submit">
             {{ editingAnnouncementId ? '保存公告' : '发布公告' }}
           </button>
@@ -420,31 +631,56 @@ onBeforeUnmount(() => {
           </button>
         </div>
       </form>
-      <article v-for="announcement in announcements" :key="announcement.id" class="admin-row">
-        <strong>{{ announcement.title }}</strong>
-        <span>{{ announcement.content }}</span>
-        <button class="text-button" type="button" @click="editAnnouncement(announcement)">编辑</button>
-        <button class="text-button" type="button" @click="deleteAnnouncement(announcement)">删除</button>
+      <article v-for="announcement in announcements" :key="announcement.id" class="management-item">
+        <div class="management-item-copy">
+          <strong>{{ announcement.title }}</strong>
+          <p>{{ announcement.content }}</p>
+        </div>
+        <div class="management-actions">
+          <button class="text-button" type="button" @click="editAnnouncement(announcement)">编辑</button>
+          <button class="text-button danger-button" type="button" @click="deleteAnnouncement(announcement)">删除</button>
+        </div>
       </article>
     </div>
 
-    <div v-if="props.section === 'articles'" class="admin-section">
-      <h2>科普文章</h2>
-      <form class="admin-form" @submit.prevent="saveArticle">
+    <div v-if="props.section === 'articles'" class="admin-section management-section">
+      <div class="management-heading">
+        <div>
+          <h2>科普文章</h2>
+          <p>整理心理健康知识，帮助用户获得可靠的科普内容。</p>
+        </div>
+        <span class="management-count">{{ articles.length }} 篇文章</span>
+      </div>
+      <form class="admin-form management-form" @submit.prevent="saveArticle">
         <input v-model="articleForm.title" maxlength="200" placeholder="文章标题" />
         <input v-model="articleForm.summary" maxlength="500" placeholder="文章摘要" />
-        <textarea v-model="articleForm.content" maxlength="200000" rows="5" placeholder="文章正文" />
-        <div>
+        <textarea
+          v-model="articleForm.content"
+          class="expandable-editor"
+          maxlength="200000"
+          rows="5"
+          placeholder="文章正文"
+          title="双击打开大窗口编辑"
+          @dblclick="openExpandedEditor('articleContent')"
+        />
+        <div class="management-actions">
           <button class="primary-button" type="submit">{{ editingArticleId ? '保存文章' : '发布文章' }}</button>
-          <button v-if="editingArticleId" class="text-button" type="button" @click="editingArticleId = null">取消编辑</button>
+          <button v-if="editingArticleId" class="text-button" type="button" @click="cancelArticleEdit">取消编辑</button>
         </div>
       </form>
       <div v-if="!articles.length" class="empty-state">暂无科普文章。</div>
-      <article v-for="article in articles" :key="article.id" class="admin-row">
-        <span>{{ article.title }}</span>
-        <span>{{ article.updatedAt }}</span>
-        <button class="text-button" type="button" @click="editArticle(article)">编辑</button>
-        <button class="text-button" type="button" @click="deleteArticle(article)">删除</button>
+      <article v-for="article in articles" :key="article.id" class="management-item">
+        <div class="management-item-copy">
+          <strong>{{ article.title }}</strong>
+          <span>
+            更新于 {{ formatArticleUpdatedAt(article.updatedAt) }} · 更新者 {{ article.updatedBy || '未记录' }}
+          </span>
+          <p>{{ article.summary || '暂无文章摘要。' }}</p>
+        </div>
+        <div class="management-actions">
+          <button class="text-button" type="button" @click="editArticle(article)">编辑</button>
+          <button class="text-button danger-button" type="button" @click="deleteArticle(article)">删除</button>
+        </div>
       </article>
     </div>
 
@@ -491,26 +727,58 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div v-if="props.section === 'knowledge'" class="admin-section">
-      <h2>知识库文档</h2>
-      <form class="admin-form" @submit.prevent="saveDocument">
+    <div v-if="props.section === 'knowledge'" class="admin-section management-section">
+      <div class="management-heading">
+        <div>
+          <h2>知识库文档</h2>
+          <p>维护 AI 对话检索使用的知识内容，并管理向量化状态。</p>
+        </div>
+        <span class="management-count">{{ documents.length }} 份文档</span>
+      </div>
+      <form class="admin-form management-form" @submit.prevent="saveDocument">
         <input v-model="documentForm.title" placeholder="文档标题" />
         <textarea v-model="documentForm.content" placeholder="文档正文" rows="4" />
-        <div>
+        <div class="management-actions">
           <button class="primary-button" :disabled="saving" type="submit">{{ saving ? '保存中...' : editingId ? '保存修改' : '新增文档' }}</button>
           <button v-if="editingId" class="text-button" type="button" @click="editingId = null">取消编辑</button>
         </div>
       </form>
       <div v-if="!documents.length" class="empty-state">暂无知识库文档。</div>
-      <article v-for="document in documents" :key="document.id" class="admin-row">
-        <span>{{ document.title }}</span>
-        <span>{{ document.vectorStatus }}</span>
-        <button class="secondary" type="button" @click="vectorize(document)">
-          {{ document.vectorStatus === 'VECTORIZED' ? '重新向量化' : '向量化' }}
-        </button>
-        <button class="text-button" type="button" @click="editDocument(document)">编辑</button>
-        <button class="text-button" type="button" @click="deleteDocument(document)">删除</button>
+      <article v-for="document in documents" :key="document.id" class="management-item">
+        <div class="management-item-copy">
+          <strong>{{ document.title }}</strong>
+          <span class="status-chip" :class="document.vectorStatus === 'VECTORIZED' ? 'status-success' : 'status-pending'">
+            {{ document.vectorStatus === 'VECTORIZED' ? '已向量化' : '待向量化' }}
+          </span>
+        </div>
+        <div class="management-actions">
+          <button class="secondary" type="button" @click="vectorize(document)">
+            {{ document.vectorStatus === 'VECTORIZED' ? '重新向量化' : '向量化' }}
+          </button>
+          <button class="text-button" type="button" @click="editDocument(document)">编辑</button>
+          <button class="text-button danger-button" type="button" @click="deleteDocument(document)">删除</button>
+        </div>
       </article>
     </div>
   </section>
+  <div
+    v-if="expandedEditorTarget"
+    class="editor-modal-backdrop"
+    @click.self="closeExpandedEditor"
+  >
+    <section class="editor-modal" role="dialog" aria-modal="true" :aria-label="expandedEditorTitle">
+      <div class="editor-modal-head">
+        <div>
+          <h2>{{ expandedEditorTitle }}</h2>
+          <p>内容较多时可在右侧滚动查看，修改会同步到表单。</p>
+        </div>
+        <button class="text-button" type="button" @click="closeExpandedEditor">关闭</button>
+      </div>
+      <textarea v-model="expandedEditorContent" class="editor-modal-textarea" maxlength="200000" />
+      <div class="editor-modal-actions">
+        <span>{{ expandedEditorContent.length }} / 200000</span>
+        <button class="primary-button" type="button" @click="closeExpandedEditor">完成编辑</button>
+      </div>
+    </section>
+  </div>
 </template>

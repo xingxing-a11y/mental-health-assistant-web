@@ -25,6 +25,7 @@ export const assessmentApi = {
   scales: () => get('/assessments/scales'),
   detail: (id) => get(`/assessments/scales/${id}`),
   submit: (data) => post('/assessments', data),
+  analyze: (resultId) => post('/assessments/analysis', { resultId }),
   history: () => get('/assessments'),
 };
 

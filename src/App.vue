@@ -1,6 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
-import { Menu, Settings, UserRound } from 'lucide-vue-next';
+import { Bell, Menu, Settings, UserRound } from 'lucide-vue-next';
 import AppSidebar from './components/AppSidebar.vue';
 import ArticleView from './components/ArticleView.vue';
 import AssessmentView from './components/AssessmentView.vue';
@@ -16,6 +16,7 @@ const active = ref('chat');
 const adminSection = ref(null);
 const mobileOpen = ref(false);
 const profileMenuOpen = ref(false);
+const announcementPanelOpen = ref(false);
 const disclaimerVisible = ref(false);
 const sessions = ref([]);
 const messages = ref([]);
@@ -33,11 +34,13 @@ const report = ref(null);
 const selectedArticle = ref(null);
 const currentSessionId = ref(null);
 const chatMode = ref('COMPANION');
+const assessmentAnalysisLoading = ref(false);
 const loading = ref(false);
 const error = ref('');
 const toast = ref('');
 const authenticated = ref(true);
 const authChecking = ref(true);
+const ANNOUNCEMENT_VISIBLE_DAYS = 10;
 
 function handleAuthExpired() {
   authenticated.value = false;
@@ -64,6 +67,21 @@ function notify(message) {
   }, 1800);
 }
 
+function isRecentAnnouncement(announcement) {
+  if (!announcement?.createdAt) {
+    return false;
+  }
+
+  const createdAt = new Date(announcement.createdAt);
+
+  if (Number.isNaN(createdAt.getTime())) {
+    return false;
+  }
+
+  const visibleSince = Date.now() - ANNOUNCEMENT_VISIBLE_DAYS * 24 * 60 * 60 * 1000;
+  return createdAt.getTime() >= visibleSince;
+}
+
 function acknowledgeDisclaimer() {
   disclaimerVisible.value = false;
 }
@@ -79,6 +97,7 @@ function selectModule(module) {
   active.value = module;
   mobileOpen.value = false;
   profileMenuOpen.value = false;
+  announcementPanelOpen.value = false;
 }
 
 function selectAdminSection(section) {
@@ -86,10 +105,17 @@ function selectAdminSection(section) {
   adminSection.value = section;
   mobileOpen.value = false;
   profileMenuOpen.value = false;
+  announcementPanelOpen.value = false;
 }
 
 function toggleProfileMenu() {
   profileMenuOpen.value = !profileMenuOpen.value;
+  announcementPanelOpen.value = false;
+}
+
+function toggleAnnouncementPanel() {
+  announcementPanelOpen.value = !announcementPanelOpen.value;
+  profileMenuOpen.value = false;
 }
 
 function selectProfileMenu(module) {
@@ -100,6 +126,9 @@ function selectProfileMenu(module) {
 function closeProfileMenu(event) {
   if (!event.target.closest('.profile-menu-wrap')) {
     profileMenuOpen.value = false;
+  }
+  if (!event.target.closest('.announcement-menu-wrap')) {
+    announcementPanelOpen.value = false;
   }
 }
 
@@ -131,7 +160,7 @@ async function loadData() {
     assessmentHistory.value = historyData || [];
     diaries.value = diaryData || [];
     emotionTrend.value = trendData || [];
-    announcements.value = announcementData || [];
+    announcements.value = (announcementData || []).filter(isRecentAnnouncement);
     favorites.value = favoriteData || [];
     disclaimerVisible.value = true;
   } catch (requestError) {
@@ -312,16 +341,25 @@ async function sendMessage(content) {
 
 async function startAssessment(scale) {
   selectedScale.value = await assessmentApi.detail(scale.id);
-  report.value = { answers: {} };
+  const answers = {};
+  selectedScale.value.questions.forEach((question) => {
+    answers[question.id] = question.type === 'MULTIPLE' ? [] : '';
+  });
+  report.value = { answers };
+  assessmentAnalysisLoading.value = false;
 }
 
 async function submitAssessment() {
-  const answers = Object.entries(report.value.answers).map(
-    ([questionId, optionId]) => ({
-      questionId: Number(questionId),
-      optionId: Number(optionId),
-    }),
-  );
+  const answers = selectedScale.value.questions.map((question) => {
+    const value = report.value.answers[question.id];
+    if (question.type === 'TEXT') {
+      return { questionId: question.id, textAnswer: value };
+    }
+    if (question.type === 'MULTIPLE') {
+      return { questionId: question.id, optionIds: value };
+    }
+    return { questionId: question.id, optionId: Number(value) };
+  });
 
   report.value = await assessmentApi.submit({
     scaleId: selectedScale.value.id,
@@ -329,6 +367,26 @@ async function submitAssessment() {
   });
   assessmentHistory.value = await assessmentApi.history();
   notify('测评报告已生成');
+}
+
+async function analyzeAssessment() {
+  if (!report.value?.resultId || assessmentAnalysisLoading.value) {
+    return;
+  }
+
+  assessmentAnalysisLoading.value = true;
+  error.value = '';
+  try {
+    const result = await assessmentApi.analyze(report.value.resultId);
+    report.value = {
+      ...report.value,
+      aiAnalysis: result.analysis,
+    };
+  } catch (requestError) {
+    error.value = requestError.message || 'AI 分析暂时不可用';
+  } finally {
+    assessmentAnalysisLoading.value = false;
+  }
 }
 
 async function showArticle(article) {
@@ -396,35 +454,62 @@ onBeforeUnmount(() => {
           <span class="eyebrow">SPACE FOR YOUR THOUGHTS</span>
           <h1>{{ titles[active] }}</h1>
         </div>
-        <div v-if="profile" class="profile-menu-wrap">
-          <button
-            class="header-user profile-trigger"
-            type="button"
-            :aria-expanded="profileMenuOpen"
-            aria-haspopup="menu"
-            @click="toggleProfileMenu"
-          >
-            <span class="avatar">{{ profile.nickname?.slice(0, 1) }}</span>
-            <span>{{ profile.nickname }}</span>
-            <UserRound :size="16" />
-          </button>
-          <div v-if="profileMenuOpen" class="profile-menu" role="menu">
-            <button type="button" role="menuitem" @click="selectProfileMenu('profile')">
-              <UserRound :size="16" />个人中心
+        <div v-if="profile" class="header-actions">
+          <div class="announcement-menu-wrap">
+            <button
+              class="notification-trigger"
+              type="button"
+              aria-label="查看系统公告"
+              :aria-expanded="announcementPanelOpen"
+              aria-haspopup="dialog"
+              @click="toggleAnnouncementPanel"
+            >
+              <Bell :size="19" />
+              <span v-if="announcements.length" class="notification-badge">
+                {{ announcements.length > 99 ? '99+' : announcements.length }}
+              </span>
             </button>
-            <button type="button" role="menuitem" @click="selectProfileMenu('settings')">
-              <Settings :size="16" />设置
+            <div v-if="announcementPanelOpen" class="announcement-panel" role="dialog" aria-label="系统公告">
+              <div class="announcement-panel-head">
+                <strong>系统公告</strong>
+                <span>{{ announcements.length }} 条</span>
+              </div>
+              <div v-if="!announcements.length" class="announcement-empty">
+                暂无系统公告
+              </div>
+              <article v-for="announcement in announcements" :key="announcement.id" class="announcement-item">
+                <strong>{{ announcement.title }}</strong>
+                <p>{{ announcement.content }}</p>
+                <time>{{ announcement.createdAt || '' }}</time>
+              </article>
+            </div>
+          </div>
+          <div class="profile-menu-wrap">
+            <button
+              class="header-user profile-trigger"
+              type="button"
+              :aria-expanded="profileMenuOpen"
+              aria-haspopup="menu"
+              @click="toggleProfileMenu"
+            >
+              <span class="avatar">{{ profile.nickname?.slice(0, 1) }}</span>
+              <span>{{ profile.nickname }}</span>
+              <UserRound :size="16" />
             </button>
+            <div v-if="profileMenuOpen" class="profile-menu" role="menu">
+              <button type="button" role="menuitem" @click="selectProfileMenu('profile')">
+                <UserRound :size="16" />个人中心
+              </button>
+              <button type="button" role="menuitem" @click="selectProfileMenu('settings')">
+                <Settings :size="16" />设置
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       <p v-if="loading" class="loading-state">正在加载...</p>
       <p v-if="error" class="error-banner">{{ error }}</p>
-      <div v-if="announcements.length" class="notice">
-        <strong>{{ announcements[0].title }}</strong>：{{ announcements[0].content }}
-      </div>
-
       <ChatView
         v-if="active === 'chat'"
         :sessions="sessions"
@@ -452,6 +537,8 @@ onBeforeUnmount(() => {
         :history="assessmentHistory"
         @start="startAssessment"
         @submit="submitAssessment"
+        @analyze="analyzeAssessment"
+        :analysis-loading="assessmentAnalysisLoading"
       />
       <ArticleView
         v-else-if="active === 'articles'"

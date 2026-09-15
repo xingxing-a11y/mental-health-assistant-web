@@ -4,9 +4,10 @@ defineProps({
   selectedScale: { type: Object, default: null },
   report: { type: Object, default: null },
   history: { type: Array, required: true },
+  analysisLoading: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['start', 'submit']);
+const emit = defineEmits(['start', 'submit', 'analyze']);
 </script>
 
 <template>
@@ -28,11 +29,31 @@ const emit = defineEmits(['start', 'submit']);
     <form v-else class="assessment-form" @submit.prevent="emit('submit')">
       <h3>{{ selectedScale.name }}</h3>
       <label v-for="question in selectedScale.questions" :key="question.id">
-        {{ question.content }}
-        <select v-model="report.answers[question.id]" required>
+        <span>{{ question.content }}</span>
+        <select
+          v-if="question.type === 'SINGLE' || question.type === 'JUDGE'"
+          v-model="report.answers[question.id]"
+          required
+        >
           <option value="" disabled>请选择</option>
-          <option v-for="option in question.options" :key="option.id" :value="option.id">{{ option.label }}</option>
+          <option v-for="option in question.options" :key="option.id" :value="option.id">
+            {{ option.label }}
+          </option>
         </select>
+        <div v-else-if="question.type === 'MULTIPLE'" class="assessment-options">
+          <label v-for="option in question.options" :key="option.id" class="assessment-option">
+            <input v-model="report.answers[question.id]" type="checkbox" :value="option.id" />
+            <span>{{ option.label }}</span>
+          </label>
+        </div>
+        <textarea
+          v-else
+          v-model="report.answers[question.id]"
+          rows="4"
+          maxlength="2000"
+          required
+          placeholder="请输入你的回答"
+        />
       </label>
       <button class="primary" type="submit">提交测评</button>
     </form>
@@ -44,6 +65,19 @@ const emit = defineEmits(['start', 'submit']);
         <ul>
         <li v-for="item in report.suggestions" :key="item">{{ item }}</li>
         </ul>
+        <div v-if="report.aiAnalysis" class="assessment-ai-analysis">
+          <h4>AI 解读与安慰</h4>
+          <p>{{ report.aiAnalysis }}</p>
+        </div>
+        <button
+          v-else
+          class="secondary assessment-analysis-button"
+          type="button"
+          :disabled="analysisLoading"
+          @click="emit('analyze')"
+        >
+          {{ analysisLoading ? '分析中...' : 'AI 分析' }}
+        </button>
       </div>
 
     <div v-if="!selectedScale" class="assessment-history">
