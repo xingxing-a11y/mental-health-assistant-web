@@ -1,9 +1,15 @@
 <script setup>
-import { onMounted, ref } from 'vue';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import * as echarts from 'echarts';
 import { adminApi, assessmentApi } from '../api/modules';
+
+const props = defineProps({
+  section: { type: String, default: 'overview' },
+});
 
 const users = ref([]);
 const userPage = ref({ page: 0, size: 20, total: 0, totalPages: 0 });
+const userKeyword = ref('');
 const documents = ref([]);
 const scales = ref([]);
 const articles = ref([]);
@@ -17,6 +23,8 @@ const questionJson = ref('[]');
 const saving = ref(false);
 const audits = ref([]);
 const statistics = ref(null);
+const overviewChart = ref(null);
+let overviewChartInstance;
 const announcements = ref([]);
 const announcementForm = ref({ title: '', content: '' });
 const editingAnnouncementId = ref(null);
@@ -26,7 +34,7 @@ const editingArticleId = ref(null);
 async function load() {
   try {
     const [userResult, documentResult, scaleResult, articleResult, auditResult, statsResult, announcementResult] = await Promise.all([
-      adminApi.users(userPage.value.page, userPage.value.size),
+      adminApi.users(userPage.value.page, userPage.value.size, userKeyword.value),
       adminApi.documents(),
       adminApi.scales(),
       adminApi.articles(),
@@ -57,6 +65,19 @@ async function changeUserPage(page) {
   await load();
 }
 
+async function searchUsers() {
+  userPage.value.page = 0;
+  await load();
+}
+
+async function clearUserSearch() {
+  if (!userKeyword.value) {
+    return;
+  }
+  userKeyword.value = '';
+  await searchUsers();
+}
+
 async function vectorize(document) {
   const action = document.vectorStatus === 'VECTORIZED'
     ? adminApi.reVectorize
@@ -71,18 +92,29 @@ async function saveDocument() {
     return;
   }
   saving.value = true;
-  const saved = editingId.value
-    ? await adminApi.updateDocument(editingId.value, documentForm.value)
-    : await adminApi.createDocument(documentForm.value);
-  if (editingId.value) {
-    const index = documents.value.findIndex((item) => item.id === editingId.value);
-    documents.value[index] = saved;
-  } else {
-    documents.value.unshift(saved);
+  error.value = '';
+  try {
+    const saved = editingId.value
+      ? await adminApi.updateDocument(editingId.value, documentForm.value)
+      : await adminApi.createDocument(documentForm.value);
+    if (editingId.value) {
+      const index = documents.value.findIndex((item) => item.id === editingId.value);
+      if (index >= 0) {
+        documents.value[index] = saved;
+      }
+    } else {
+      documents.value.unshift(saved);
+    }
+    documentForm.value = { title: '', content: '' };
+    editingId.value = null;
+  } catch (requestError) {
+    error.value = requestError.message || '知识库文档保存失败';
+    if (requestError.message === '知识库文档不存在') {
+      editingId.value = null;
+    }
+  } finally {
+    saving.value = false;
   }
-  documentForm.value = { title: '', content: '' };
-  editingId.value = null;
-  saving.value = false;
 }
 
 function editDocument(document) {
@@ -213,13 +245,87 @@ async function saveQuestions() {
   questionScaleId.value = null;
 }
 
-onMounted(load);
+async function renderOverviewChart() {
+  await nextTick();
+  if (props.section !== 'overview' || !overviewChart.value || !statistics.value) {
+    return;
+  }
+  if (!overviewChartInstance) {
+    overviewChartInstance = echarts.init(overviewChart.value);
+  }
+  overviewChartInstance.setOption({
+    animationDuration: 450,
+    color: ['#2f6b58', '#dba95d', '#6f9f91'],
+    tooltip: { trigger: 'axis' },
+    grid: { top: 24, right: 24, bottom: 34, left: 48 },
+    xAxis: {
+      type: 'category',
+      data: ['用户', '测评完成', '聊天会话'],
+      axisLine: { lineStyle: { color: '#c8d8d0' } },
+      axisLabel: { color: '#668078' },
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      splitLine: { lineStyle: { color: '#e6eee9' } },
+      axisLabel: { color: '#8aa097' },
+    },
+    series: [{
+      type: 'bar',
+      barMaxWidth: 56,
+      data: [
+        statistics.value.registeredUsers || 0,
+        statistics.value.assessmentCompletions || 0,
+        statistics.value.chatSessions || 0,
+      ],
+      itemStyle: { borderRadius: [6, 6, 0, 0] },
+    }],
+  });
+}
+
+function resizeOverviewChart() {
+  overviewChartInstance?.resize();
+}
+
+function formatAuditTime(value) {
+  if (!value) {
+    return '-';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
+  return date.toLocaleString('zh-CN', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  });
+}
+
+onMounted(() => {
+  load();
+  window.addEventListener('resize', resizeOverviewChart);
+});
+
+watch(
+  () => [props.section, statistics.value],
+  renderOverviewChart,
+  { deep: true },
+);
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', resizeOverviewChart);
+  overviewChartInstance?.dispose();
+  overviewChartInstance = undefined;
+});
 </script>
 
 <template>
   <section class="content admin-page">
     <p v-if="error" class="error-banner">{{ error }}</p>
-    <div class="admin-section">
+    <div v-if="props.section === 'scales'" class="admin-section">
       <h2>测评量表</h2>
       <form class="admin-form" @submit.prevent="saveScale">
         <input v-model="scaleForm.name" placeholder="量表名称" />
@@ -248,14 +354,54 @@ onMounted(load);
       </div>
     </div>
 
-    <div class="admin-section">
+    <div v-if="props.section === 'overview'" class="admin-section">
       <h2>数据概览</h2>
-      <p v-if="statistics">用户 {{ statistics.registeredUsers }} · 测评 {{ statistics.assessmentCompletions }} · 会话 {{ statistics.chatSessions }}</p>
-      <h3>高危审计</h3>
-      <p v-for="audit in audits" :key="audit.sessionId">会话 {{ audit.sessionId }} · {{ audit.summary }}</p>
+      <div v-if="statistics" class="metric-grid">
+        <article class="metric-card">
+          <span>注册用户</span>
+          <strong>{{ statistics.registeredUsers || 0 }}</strong>
+          <small>当前系统用户总数</small>
+        </article>
+        <article class="metric-card metric-card-gold">
+          <span>测评完成</span>
+          <strong>{{ statistics.assessmentCompletions || 0 }}</strong>
+          <small>已提交的测评结果</small>
+        </article>
+        <article class="metric-card metric-card-blue">
+          <span>聊天会话</span>
+          <strong>{{ statistics.chatSessions || 0 }}</strong>
+          <small>累计创建的会话</small>
+        </article>
+      </div>
+      <div class="overview-chart-panel">
+        <div>
+          <h3>核心指标对比</h3>
+          <p>基于当前系统累计数据</p>
+        </div>
+        <div ref="overviewChart" class="overview-chart" aria-label="用户、测评和聊天会话数量对比图" />
+      </div>
+      <div class="audit-panel">
+        <div class="section-title compact-title">
+          <div><h3>高危审计</h3><p>需要关注的会话记录</p></div>
+          <span class="audit-count">{{ audits.length }} 条</span>
+        </div>
+        <div v-if="!audits.length" class="empty-state">暂无高危审计记录。</div>
+        <div v-else class="audit-table" role="table" aria-label="高危审计记录">
+          <div class="audit-row audit-row-head" role="row">
+            <span>会话</span>
+            <span>触发内容</span>
+            <span>时间</span>
+          </div>
+          <div v-for="audit in audits" :key="audit.sessionId" class="audit-row" role="row">
+            <strong>#{{ audit.sessionId }}</strong>
+            <span>{{ audit.summary }}</span>
+            <time>{{ formatAuditTime(audit.createdAt) }}</time>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div class="admin-section">
+    <div v-if="props.section === 'announcements'" class="admin-section">
       <h2>系统公告</h2>
       <form class="admin-form" @submit.prevent="saveAnnouncement">
         <input v-model="announcementForm.title" placeholder="公告标题" maxlength="200" />
@@ -282,7 +428,7 @@ onMounted(load);
       </article>
     </div>
 
-    <div class="admin-section">
+    <div v-if="props.section === 'articles'" class="admin-section">
       <h2>科普文章</h2>
       <form class="admin-form" @submit.prevent="saveArticle">
         <input v-model="articleForm.title" maxlength="200" placeholder="文章标题" />
@@ -302,9 +448,34 @@ onMounted(load);
       </article>
     </div>
 
-    <div class="admin-section">
+    <div v-if="props.section === 'users'" class="admin-section">
       <h2>用户管理</h2>
+      <form class="user-search" role="search" @submit.prevent="searchUsers">
+        <label for="user-keyword">搜索用户名</label>
+        <input
+          id="user-keyword"
+          v-model="userKeyword"
+          maxlength="100"
+          autocomplete="off"
+          placeholder="输入用户名"
+        />
+        <button class="primary-button" type="submit">搜索</button>
+        <button
+          v-if="userKeyword"
+          class="text-button"
+          type="button"
+          @click="clearUserSearch"
+        >
+          清空
+        </button>
+      </form>
       <div v-if="!users.length" class="empty-state">暂无用户。</div>
+      <div v-else class="admin-row user-row-head">
+        <span>账号</span>
+        <span>用户名</span>
+        <span>状态</span>
+        <span>操作</span>
+      </div>
       <article v-for="user in users" :key="user.id" class="admin-row">
         <span>{{ user.username }}</span>
         <span>{{ user.nickname }}</span>
@@ -320,7 +491,7 @@ onMounted(load);
       </div>
     </div>
 
-    <div class="admin-section">
+    <div v-if="props.section === 'knowledge'" class="admin-section">
       <h2>知识库文档</h2>
       <form class="admin-form" @submit.prevent="saveDocument">
         <input v-model="documentForm.title" placeholder="文档标题" />

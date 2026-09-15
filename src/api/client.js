@@ -7,11 +7,25 @@ export async function request(path, options = {}) {
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${API_PREFIX}${path}`, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 30000);
+
+  let response;
+  try {
+    response = await fetch(`${API_PREFIX}${path}`, {
+      ...options,
+      headers,
+      credentials: 'include',
+      signal: options.signal || controller.signal,
+    });
+  } catch (requestError) {
+    if (requestError.name === 'AbortError') {
+      throw new Error('请求超时，请检查后端服务和数据库连接');
+    }
+    throw new Error('无法连接服务器，请检查后端服务是否已启动');
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 
   if (response.status === 401) {
     window.dispatchEvent(new CustomEvent('mh-auth-expired'));

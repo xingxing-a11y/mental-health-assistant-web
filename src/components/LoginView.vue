@@ -51,7 +51,7 @@ function toggleMode() {
 
       <form @submit.prevent="submit">
         <label>
-          用户名
+          账号
           <input v-model.trim="form.username" required autocomplete="username" />
         </label>
 
@@ -73,7 +73,7 @@ function toggleMode() {
           </label>
 
           <label>
-            昵称
+            用户名
             <input v-model.trim="form.nickname" required />
           </label>
         </template>

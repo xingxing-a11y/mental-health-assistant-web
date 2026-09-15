@@ -15,6 +15,7 @@ export const chatApi = {
   history: (id) => get(`/chat/sessions/${id}/messages`),
   clearContext: (id) => remove(`/chat/sessions/${id}/context`),
   remove: (id) => remove(`/chat/sessions/${id}`),
+  rename: (id, name) => put(`/chat/sessions/${id}/name`, { name }),
   updateSettings: (id, mode) => put(`/chat/sessions/${id}/settings`, { mode }),
   favoriteMessage: (id, favorite) => put(`/chat/messages/${id}/favorite`, { favorite }),
   favorites: () => get('/chat/messages/favorites'),
@@ -48,7 +49,13 @@ export const diaryApi = {
 };
 
 export const adminApi = {
-  users: (page = 0, size = 20) => get(`/admin/users?page=${page}&size=${size}`),
+  users: (page = 0, size = 20, nickname = '') => {
+    const params = new URLSearchParams({ page, size });
+    if (nickname.trim()) {
+      params.set('nickname', nickname.trim());
+    }
+    return get(`/admin/users?${params.toString()}`);
+  },
   updateUserStatus: (id, status) => put(`/admin/users/${id}/status`, { status }),
   documents: () => get('/admin/knowledge-documents'),
   createDocument: (data) => post('/admin/knowledge-documents', data),
