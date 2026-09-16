@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue';
-import { Plus, Send, Sparkles, Trash2, RotateCcw } from 'lucide-vue-next';
+import { Archive, MoreHorizontal, Pencil, Pin, Plus, RotateCcw, Send, Sparkles } from 'lucide-vue-next';
 
 const props = defineProps({
   sessions: { type: Array, required: true },
@@ -12,7 +12,7 @@ const props = defineProps({
   disclaimerVisible: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['create', 'open', 'delete', 'send', 'clear', 'mode', 'favorite', 'load-favorites', 'rename']);
+const emit = defineEmits(['create', 'open', 'archive', 'send', 'clear', 'mode', 'favorite', 'load-favorites', 'rename', 'pin']);
 const input = ref('');
 const sessionWidth = ref(280);
 const renamingId = ref(null);
@@ -20,6 +20,7 @@ const renameValue = ref('');
 const renameInput = ref(null);
 const messagesContainer = ref(null);
 const favoritesVisible = ref(false);
+const openMenuId = ref(null);
 
 const visibleFavorites = computed(() => props.favorites.filter(
   (favorite) => String(favorite.sessionId) === String(props.currentSessionId),
@@ -93,16 +94,81 @@ function saveRename(session) {
   renamingId.value = null;
 }
 
+function toggleSessionMenu(sessionId) {
+  openMenuId.value = openMenuId.value === sessionId ? null : sessionId;
+}
+
+function closeSessionMenuOnOutsideClick(event) {
+  if (!event.target.closest('.session-actions')) {
+    openMenuId.value = null;
+  }
+}
+
+function selectSessionAction(action, session) {
+  openMenuId.value = null;
+
+  if (action === 'pin') {
+    emit('pin', session);
+    return;
+  }
+
+  if (action === 'archive') {
+    emit('archive', session);
+    return;
+  }
+
+  startRename(session);
+}
+
 </script>
 
 <template>
-  <section class="content chat-layout" :class="{ 'disclaimer-open': props.disclaimerVisible }" :style="{ gridTemplateColumns: `${sessionWidth}px 6px minmax(0, 1fr)` }">
+  <section class="content chat-layout" :class="{ 'disclaimer-open': props.disclaimerVisible }" :style="{ gridTemplateColumns: `${sessionWidth}px 6px minmax(0, 1fr)` }" @click="closeSessionMenuOnOutsideClick">
     <div class="session-panel">
       <div class="panel-head"><h2>我的会话</h2><button class="primary small" :class="{ 'disclaimer-open': props.disclaimerVisible }" @click="emit('create')"><Plus :size="16" />新建</button></div>
       <div v-if="!sessions.length" class="empty-state">暂无会话。</div>
       <div v-for="session in sessions" :key="session.id" class="session-row">
-        <button class="session-item" @click="emit('open', session)"><input v-if="renamingId === session.id" :ref="setRenameInput" v-model="renameValue" @click.stop @keydown.enter.prevent="saveRename(session)" @blur="saveRename(session)" /><strong v-else :class="{ 'session-title-scrollable': session.name && session.name.length > 16 }" @dblclick.stop="startRename(session)">{{ session.name }}</strong></button>
-        <button class="icon danger" title="删除会话" @click="emit('delete', session)"><Trash2 :size="15" /></button>
+        <button class="session-item" @click="emit('open', session)">
+          <input
+            v-if="renamingId === session.id"
+            :ref="setRenameInput"
+            v-model="renameValue"
+            @click.stop
+            @keydown.enter.prevent="saveRename(session)"
+            @blur="saveRename(session)"
+          />
+          <strong
+            v-else
+            :class="{ 'session-title-scrollable': session.name && session.name.length > 16 }"
+            @dblclick.stop="startRename(session)"
+          >
+            <Pin v-if="session.pinned" :size="13" class="session-pin" />
+            {{ session.name }}
+          </strong>
+        </button>
+        <div class="session-actions">
+          <button
+            class="icon session-menu-trigger"
+            type="button"
+            title="会话操作"
+            :aria-expanded="openMenuId === session.id"
+            aria-haspopup="menu"
+            @click.stop="toggleSessionMenu(session.id)"
+          >
+            <MoreHorizontal :size="17" />
+          </button>
+          <div v-if="openMenuId === session.id" class="session-menu" role="menu">
+            <button type="button" role="menuitem" @click="selectSessionAction('pin', session)">
+              <Pin :size="14" />{{ session.pinned ? '取消置顶' : '置顶' }}
+            </button>
+            <button type="button" role="menuitem" @click="selectSessionAction('rename', session)">
+              <Pencil :size="14" />重命名
+            </button>
+            <button type="button" role="menuitem" @click="selectSessionAction('archive', session)">
+              <Archive :size="14" />归档
+            </button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="chat-divider" title="拖动调整宽度" @pointerdown="startResize"></div>

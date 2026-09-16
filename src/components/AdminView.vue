@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import * as echarts from 'echarts';
+import { formatDateTime } from '../utils/dateTime';
 import { adminApi, assessmentApi } from '../api/modules';
 
 const props = defineProps({
@@ -217,22 +218,6 @@ function closeExpandedEditor() {
   expandedEditorTarget.value = null;
 }
 
-function formatArticleUpdatedAt(value) {
-  if (!value) {
-    return '-';
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '-';
-  }
-
-  const pad = (number) => String(number).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} `
-    + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}
-
 async function saveArticle() {
   if (!articleForm.value.title.trim() || !articleForm.value.content.trim()) return;
   const saved = editingArticleId.value
@@ -287,6 +272,8 @@ async function editQuestions(scale) {
         label: option.label,
         score: option.score,
       })),
+      matrixRows: question.matrixRows || '',
+      matrixColumns: question.matrixColumns || '',
     }));
 }
 
@@ -299,6 +286,8 @@ function addQuestion() {
       { label: '', score: 0 },
       { label: '', score: 0 },
     ],
+    matrixRows: '',
+    matrixColumns: '',
   });
 }
 
@@ -312,6 +301,14 @@ function removeQuestion(index) {
 function changeQuestionType(question) {
   if (question.type === 'TEXT') {
     question.options = [];
+    return;
+  }
+
+  if (question.type === 'MATRIX') {
+    question.matrixRows = question.matrixRows || '项目一\n项目二';
+    question.matrixColumns = question.matrixColumns || '从不\n偶尔\n经常';
+    question.options = question.matrixColumns.split('\n').filter(Boolean)
+      .map((label, index) => ({ label, score: index }));
     return;
   }
 
@@ -364,6 +361,8 @@ async function saveQuestions() {
     order: question.order,
     content: question.content.trim(),
     type: question.type,
+    matrixRows: question.type === 'MATRIX' ? question.matrixRows : null,
+    matrixColumns: question.type === 'MATRIX' ? question.matrixColumns : null,
     options: question.type === 'TEXT'
       ? []
       : question.options
@@ -437,23 +436,6 @@ function destroyOverviewChart() {
 
   overviewChartInstance.dispose();
   overviewChartInstance = undefined;
-}
-
-function formatAuditTime(value) {
-  if (!value) {
-    return '-';
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '-';
-  }
-
-  return date.toLocaleString('zh-CN', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
 }
 
 onMounted(() => {
@@ -537,9 +519,14 @@ onBeforeUnmount(() => {
               <option value="MULTIPLE">多选题</option>
               <option value="TEXT">文字题</option>
               <option value="JUDGE">判断题</option>
+              <option value="MATRIX">矩阵量表题</option>
             </select>
           </label>
           <div v-if="question.type !== 'TEXT'" class="option-editor">
+            <div v-if="question.type === 'MATRIX'" class="matrix-editor-fields">
+              <label>矩阵行（每行一个项目）<textarea v-model="question.matrixRows" rows="3" /></label>
+              <label>矩阵列（每行一个选项）<textarea v-model="question.matrixColumns" rows="3" /></label>
+            </div>
             <div class="option-editor-head">
               <span>选项与分值</span>
               <button class="text-button" type="button" @click="addOption(question)">添加选项</button>
@@ -600,7 +587,7 @@ onBeforeUnmount(() => {
           <div v-for="audit in audits" :key="audit.sessionId" class="audit-row" role="row">
             <strong>#{{ audit.sessionId }}</strong>
             <span>{{ audit.summary }}</span>
-            <time>{{ formatAuditTime(audit.createdAt) }}</time>
+            <time>{{ formatDateTime(audit.createdAt) }}</time>
           </div>
         </div>
       </div>
@@ -673,7 +660,7 @@ onBeforeUnmount(() => {
         <div class="management-item-copy">
           <strong>{{ article.title }}</strong>
           <span>
-            更新于 {{ formatArticleUpdatedAt(article.updatedAt) }} · 更新者 {{ article.updatedBy || '未记录' }}
+            更新于 {{ formatDateTime(article.updatedAt) }} · 更新者 {{ article.updatedBy || '未记录' }}
           </span>
           <p>{{ article.summary || '暂无文章摘要。' }}</p>
         </div>

@@ -1,12 +1,29 @@
 <script setup>
 import { ref } from 'vue';
+import { X } from 'lucide-vue-next';
+import { formatDateTime } from '../utils/dateTime';
 
-defineProps({ diaries: { type: Array, required: true }, trend: { type: Array, required: true } });
-const emit = defineEmits(['create', 'delete', 'analyze', 'trend']);
+defineProps({
+  diaries: { type: Array, required: true },
+  trend: { type: Array, required: true },
+  searchResults: { type: Array, default: () => [] },
+  analysisLoading: { type: Boolean, default: false },
+  allVisible: { type: Boolean, default: false },
+  allDiaries: { type: Array, default: () => [] },
+  allLoading: { type: Boolean, default: false },
+  allPage: { type: Number, default: 0 },
+  allTotalPages: { type: Number, default: 0 },
+  allTotal: { type: Number, default: 0 },
+});
+const emit = defineEmits(['create', 'delete', 'analyze', 'trend', 'update', 'open-all', 'close-all', 'all-page']);
 const content = ref('');
 const emotion = ref('CALM');
 const startDate = ref('');
 const endDate = ref('');
+const selectedDiary = ref(null);
+const editing = ref(false);
+const editContent = ref('');
+const editEmotion = ref('CALM');
 const emotionLabels = {
   HAPPY: '😊 开心',
   CALM: '😌 平静',
@@ -21,25 +38,42 @@ function submit() {
   content.value = '';
 }
 
-function formatDiaryTime(value) {
-  if (!value) {
-    return '-';
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return '-';
-  }
-
-  return date.toLocaleString('zh-CN', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
-}
-
 function displayEmotion(value) {
   return emotionLabels[value] || value || '未记录';
+}
+
+function openDiary(diary) {
+  selectedDiary.value = diary;
+  editing.value = false;
+}
+
+function startEdit() {
+  editContent.value = selectedDiary.value.content;
+  editEmotion.value = selectedDiary.value.emotion;
+  editing.value = true;
+}
+
+function saveEdit() {
+  if (!editContent.value.trim()) return;
+  emit('update', selectedDiary.value, {
+    content: editContent.value.trim(),
+    emotion: editEmotion.value,
+  });
+  selectedDiary.value = {
+    ...selectedDiary.value,
+    content: editContent.value.trim(),
+    emotion: editEmotion.value,
+  };
+  editing.value = false;
+}
+
+function closeAll() {
+  emit('close-all');
+}
+
+function goPage(page) {
+  if (page < 0 || page > 9999) return;
+  emit('all-page', page);
 }
 </script>
 
@@ -89,17 +123,34 @@ function displayEmotion(value) {
         <span>{{ diaries.length }} 条记录</span>
       </div>
       <div class="diary-entry-list">
-        <article v-for="diary in diaries" :key="diary.id" class="diary-entry">
+        <article
+          v-for="diary in diaries.slice(0, 2)"
+          :key="diary.id"
+          class="diary-entry diary-entry-clickable"
+          @click="openDiary(diary)"
+        >
           <div class="diary-entry-meta">
             <strong :class="`emotion-${diary.emotion.toLowerCase()}`">{{ displayEmotion(diary.emotion) }}</strong>
-            <time>{{ formatDiaryTime(diary.createdAt) }}</time>
+            <time>{{ formatDateTime(diary.createdAt) }}</time>
           </div>
           <p>{{ diary.content }}</p>
           <div class="diary-entry-actions">
-            <button class="text-button" type="button" @click="emit('analyze', diary)">AI 分析</button>
-            <button class="text-button danger-button" type="button" @click="emit('delete', diary)">删除</button>
+            <button
+              class="text-button"
+              type="button"
+              :disabled="analysisLoading"
+              @click.stop="emit('analyze', diary)"
+            >
+              {{ analysisLoading ? '分析中...' : 'AI 分析' }}
+            </button>
+            <button class="text-button danger-button" type="button" @click.stop="emit('delete', diary)">删除</button>
           </div>
         </article>
+      </div>
+      <div v-if="diaries.length > 2" class="diary-all-button-container">
+        <button class="secondary diary-all-button" type="button" @click="emit('open-all')">
+          所有日记（{{ diaries.length }}）
+        </button>
       </div>
       <div v-if="!diaries.length" class="empty-state diary-empty">暂无日记，写下第一条记录吧。</div>
     </section>
@@ -118,12 +169,110 @@ function displayEmotion(value) {
       </form>
       <div class="trend-list">
         <div v-for="item in trend" :key="item.date" class="trend-item">
-          <span>{{ item.date }}</span>
+          <span>{{ formatDateTime(item.date) }}</span>
           <div class="trend-bar" :class="item.emotion.toLowerCase()"></div>
           <strong>{{ item.emotion }}</strong>
         </div>
       </div>
-      <p v-if="!trend.length" class="empty-state">暂无趋势数据。</p>
+      <div v-if="searchResults.length" class="diary-search-results">
+        <h4>查询到的日记（{{ searchResults.length }} 条）</h4>
+        <article
+          v-for="diary in searchResults"
+          :key="diary.id"
+          class="diary-search-result diary-entry-clickable"
+          @click="openDiary(diary)"
+        >
+          <div class="diary-entry-meta">
+            <strong :class="`emotion-${diary.emotion.toLowerCase()}`">{{ displayEmotion(diary.emotion) }}</strong>
+            <time>{{ formatDateTime(diary.createdAt) }}</time>
+          </div>
+          <p>{{ diary.content }}</p>
+        </article>
+      </div>
+      <p v-else-if="!trend.length" class="empty-state">暂无趋势数据。</p>
     </section>
+
+    <div v-if="allVisible" class="diary-modal-backdrop" @click.self="closeAll">
+      <section class="diary-modal" role="dialog" aria-modal="true">
+        <div class="diary-modal-head">
+          <h3>所有日记</h3>
+          <button class="icon" type="button" @click="closeAll"><X :size="18" /></button>
+        </div>
+        <div class="diary-modal-list">
+          <div v-if="allLoading" class="loading-state">加载中...</div>
+          <template v-else>
+            <article
+              v-for="diary in allDiaries"
+              :key="diary.id"
+              class="diary-entry diary-entry-clickable"
+              @click="openDiary(diary)"
+            >
+              <div class="diary-entry-meta">
+                <strong :class="`emotion-${diary.emotion.toLowerCase()}`">{{ displayEmotion(diary.emotion) }}</strong>
+                <time>{{ formatDateTime(diary.createdAt) }}</time>
+              </div>
+              <p>{{ diary.content }}</p>
+            </article>
+            <div v-if="!allDiaries.length" class="empty-state diary-empty">暂无日记。</div>
+          </template>
+        </div>
+        <div class="diary-modal-pagination">
+          <span>共 {{ allTotal }} 条 · 第 {{ allPage + 1 }} / {{ Math.max(allTotalPages, 1) }} 页</span>
+          <div class="diary-modal-pagination-actions">
+            <button class="secondary small" type="button" :disabled="allPage === 0 || allLoading" @click="goPage(allPage - 1)">
+              上一页
+            </button>
+            <button
+              class="secondary small"
+              type="button"
+              :disabled="allPage + 1 >= allTotalPages || allLoading"
+              @click="goPage(allPage + 1)"
+            >
+              下一页
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="selectedDiary" class="diary-modal-backdrop" @click.self="selectedDiary = null">
+      <section class="diary-modal diary-detail-modal" role="dialog" aria-modal="true">
+        <div class="diary-modal-head">
+          <h3>{{ editing ? '编辑日记' : '日记详情' }}</h3>
+          <button class="icon" type="button" @click="selectedDiary = null"><X :size="18" /></button>
+        </div>
+        <template v-if="editing">
+          <label class="diary-field">
+            <span>情绪</span>
+            <select v-model="editEmotion">
+              <option value="HAPPY">😊 开心</option>
+              <option value="CALM">😌 平静</option>
+              <option value="STRESSED">😣 压力大</option>
+              <option value="ANXIOUS">😟 焦虑</option>
+              <option value="LOW">😔 低落</option>
+            </select>
+          </label>
+          <label class="diary-field">
+            <span>内容</span>
+            <textarea v-model="editContent" rows="10" maxlength="10000" />
+          </label>
+          <div class="diary-modal-actions">
+            <button class="secondary" type="button" @click="editing = false">取消</button>
+            <button class="primary-button" type="button" @click="saveEdit">保存修改</button>
+          </div>
+        </template>
+        <template v-else>
+          <div class="diary-entry-meta">
+            <strong :class="`emotion-${selectedDiary.emotion.toLowerCase()}`">{{ displayEmotion(selectedDiary.emotion) }}</strong>
+            <time>{{ formatDateTime(selectedDiary.createdAt) }}</time>
+          </div>
+          <p class="diary-detail-content">{{ selectedDiary.content }}</p>
+          <div class="diary-modal-actions">
+            <button class="secondary" type="button" @click="startEdit">编辑</button>
+            <button class="primary-button" type="button" @click="selectedDiary = null">关闭</button>
+          </div>
+        </template>
+      </section>
+    </div>
   </section>
 </template>

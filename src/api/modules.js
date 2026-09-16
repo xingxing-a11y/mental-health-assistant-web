@@ -1,4 +1,4 @@
-import { get, post, put, remove } from './client';
+import { get, post, put, remove, request } from './client';
 
 export const userApi = {
   current: () => get('/users/me'),
@@ -6,16 +6,25 @@ export const userApi = {
   register: (data) => post('/auth/register', data),
   logout: () => post('/auth/logout'),
   updateProfile: (data) => put('/users/me', data),
+  uploadAvatar: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return request('/users/me/avatar', { method: 'POST', body: formData });
+  },
   updatePassword: (data) => put('/users/me/password', data),
 };
 
 export const chatApi = {
   list: () => get('/chat/sessions'),
+  archived: () => get('/chat/sessions/archived'),
   create: (data) => post('/chat/sessions', data),
   history: (id) => get(`/chat/sessions/${id}/messages`),
   clearContext: (id) => remove(`/chat/sessions/${id}/context`),
   remove: (id) => remove(`/chat/sessions/${id}`),
   rename: (id, name) => put(`/chat/sessions/${id}/name`, { name }),
+  togglePin: (id) => put(`/chat/sessions/${id}/pin`),
+  archive: (id) => put(`/chat/sessions/${id}/archive`),
+  unarchive: (id) => put(`/chat/sessions/${id}/unarchive`),
   updateSettings: (id, mode) => put(`/chat/sessions/${id}/settings`, { mode }),
   favoriteMessage: (id, favorite) => put(`/chat/messages/${id}/favorite`, { favorite }),
   favorites: () => get('/chat/messages/favorites'),
@@ -35,9 +44,16 @@ export const articleApi = {
 };
 
 export const diaryApi = {
-  list: () => get('/diaries'),
-  get: (id) => get(`/diaries/${id}`),
   create: (data) => post('/diaries', data),
+  list: () => get('/diaries/recent'),
+  all: (page = 0, size = 10, startDate = '', endDate = '') => {
+    const params = new URLSearchParams({ page, size });
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
+    return get(`/diaries?${params.toString()}`);
+  },
+  get: (id) => get(`/diaries/${id}`),
+  update: (id, data) => put(`/diaries/${id}`, data),
   remove: (id) => remove(`/diaries/${id}`),
   analyze: (id) => post(`/diaries/${id}/analysis`),
   trend: (startDate = '', endDate = '') => {

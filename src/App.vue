@@ -1,46 +1,70 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue';
-import { Bell, Menu, Settings, UserRound } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { Bell, Menu, Settings, UserRound, X } from 'lucide-vue-next';
 import AppSidebar from './components/AppSidebar.vue';
 import ArticleView from './components/ArticleView.vue';
 import AssessmentView from './components/AssessmentView.vue';
 import ChatView from './components/ChatView.vue';
 import DisclaimerModal from './components/DisclaimerModal.vue';
 import ProfileView from './components/ProfileView.vue';
+import SettingsView from './components/SettingsView.vue';
 import LoginView from './components/LoginView.vue';
 import AdminView from './components/AdminView.vue';
 import DiaryView from './components/DiaryView.vue';
 import { announcementApi, articleApi, assessmentApi, chatApi, diaryApi, streamChat, userApi } from './api/modules';
+import { formatDateTime } from './utils/dateTime';
 
 const active = ref('chat');
 const adminSection = ref(null);
 const mobileOpen = ref(false);
 const profileMenuOpen = ref(false);
-const announcementPanelOpen = ref(false);
+const announcementModalOpen = ref(false);
+const selectedAnnouncement = ref(null);
+const announcementReadIds = ref(new Set());
+let announcementPollingId;
 const disclaimerVisible = ref(false);
 const sessions = ref([]);
+const archivedSessions = ref([]);
+const archivedSessionsVisible = ref(false);
+const archivedSessionsLoading = ref(false);
 const messages = ref([]);
 const favorites = ref([]);
 const pendingSessions = ref(new Set());
 const scales = ref([]);
 const assessmentHistory = ref([]);
 const diaries = ref([]);
+const diarySearchResults = ref([]);
 const emotionTrend = ref([]);
+const allDiaries = ref([]);
+const allDiariesVisible = ref(false);
+const allDiariesLoading = ref(false);
+const allDiariesPage = ref(0);
+const allDiariesTotalPages = ref(0);
+const allDiariesTotal = ref(0);
+const ALL_DIARIES_PAGE_SIZE = 10;
 const announcements = ref([]);
 const articles = ref([]);
 const profile = ref(null);
+const avatarUploading = ref(false);
 const selectedScale = ref(null);
 const report = ref(null);
 const selectedArticle = ref(null);
 const currentSessionId = ref(null);
 const chatMode = ref('COMPANION');
 const assessmentAnalysisLoading = ref(false);
+const diaryAnalysis = ref('');
+const diaryAnalysisLoading = ref(false);
 const loading = ref(false);
 const error = ref('');
 const toast = ref('');
 const authenticated = ref(true);
 const authChecking = ref(true);
 const ANNOUNCEMENT_VISIBLE_DAYS = 10;
+const ANNOUNCEMENT_POLL_INTERVAL = 30000;
+
+const unreadAnnouncementCount = computed(() => announcements.value
+  .filter((announcement) => !announcementReadIds.value.has(String(announcement.id)))
+  .length);
 
 function handleAuthExpired() {
   authenticated.value = false;
@@ -48,6 +72,7 @@ function handleAuthExpired() {
   profile.value = null;
   sessions.value = [];
   messages.value = [];
+  announcementModalOpen.value = false;
 }
 
 const titles = {
@@ -60,11 +85,11 @@ const titles = {
   admin: '管理后台',
 };
 
-function notify(message) {
+function notify(message, duration = 1800) {
   toast.value = message;
   window.setTimeout(() => {
     toast.value = '';
-  }, 1800);
+  }, duration);
 }
 
 function isRecentAnnouncement(announcement) {
@@ -97,7 +122,10 @@ function selectModule(module) {
   active.value = module;
   mobileOpen.value = false;
   profileMenuOpen.value = false;
-  announcementPanelOpen.value = false;
+  announcementModalOpen.value = false;
+  if (module !== 'settings') {
+    archivedSessionsVisible.value = false;
+  }
 }
 
 function selectAdminSection(section) {
@@ -105,30 +133,110 @@ function selectAdminSection(section) {
   adminSection.value = section;
   mobileOpen.value = false;
   profileMenuOpen.value = false;
-  announcementPanelOpen.value = false;
+  announcementModalOpen.value = false;
 }
 
 function toggleProfileMenu() {
   profileMenuOpen.value = !profileMenuOpen.value;
-  announcementPanelOpen.value = false;
+  announcementModalOpen.value = false;
 }
 
-function toggleAnnouncementPanel() {
-  announcementPanelOpen.value = !announcementPanelOpen.value;
+function announcementReadStorageKey() {
+  return `mh-read-announcements-${profile.value?.id || 'anonymous'}`;
+}
+
+function loadReadAnnouncementIds() {
+  try {
+    const storedIds = JSON.parse(localStorage.getItem(announcementReadStorageKey()) || '[]');
+    announcementReadIds.value = new Set(Array.isArray(storedIds) ? storedIds.map(String) : []);
+  } catch {
+    announcementReadIds.value = new Set();
+  }
+}
+
+function persistReadAnnouncementIds() {
+  localStorage.setItem(
+    announcementReadStorageKey(),
+    JSON.stringify([...announcementReadIds.value]),
+  );
+}
+
+function markAnnouncementsRead() {
+  const nextReadIds = new Set(announcementReadIds.value);
+  announcements.value.forEach((announcement) => nextReadIds.add(String(announcement.id)));
+  announcementReadIds.value = nextReadIds;
+  persistReadAnnouncementIds();
+}
+
+function markAnnouncementRead(announcement) {
+  const nextReadIds = new Set(announcementReadIds.value);
+  nextReadIds.add(String(announcement.id));
+  announcementReadIds.value = nextReadIds;
+  persistReadAnnouncementIds();
+}
+
+function toggleAnnouncementModal() {
+  announcementModalOpen.value = !announcementModalOpen.value;
   profileMenuOpen.value = false;
+}
+
+function closeAnnouncementModal() {
+  announcementModalOpen.value = false;
+  selectedAnnouncement.value = null;
+}
+
+function openAnnouncementDetail(announcement) {
+  markAnnouncementRead(announcement);
+  selectedAnnouncement.value = announcement;
+}
+
+function closeAnnouncementDetail() {
+  selectedAnnouncement.value = null;
+}
+
+function handleAnnouncementCardKeydown(event, announcement) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    openAnnouncementDetail(announcement);
+  }
 }
 
 function selectProfileMenu(module) {
   active.value = module;
   profileMenuOpen.value = false;
+  if (module === 'settings') {
+    archivedSessionsVisible.value = false;
+  }
 }
 
 function closeProfileMenu(event) {
   if (!event.target.closest('.profile-menu-wrap')) {
     profileMenuOpen.value = false;
   }
-  if (!event.target.closest('.announcement-menu-wrap')) {
-    announcementPanelOpen.value = false;
+}
+
+function handleAnnouncementKeydown(event) {
+  if (event.key !== 'Escape') {
+    return;
+  }
+
+  if (selectedAnnouncement.value) {
+    closeAnnouncementDetail();
+  } else if (announcementModalOpen.value) {
+    closeAnnouncementModal();
+  }
+}
+
+async function refreshAnnouncements() {
+  if (!authenticated.value || !profile.value) {
+    return;
+  }
+
+  try {
+    const announcementData = await announcementApi.list();
+    announcements.value = (announcementData || []).filter(isRecentAnnouncement);
+  } catch {
+    // 后台轮询失败不打断用户当前页面，下一次轮询会继续尝试。
   }
 }
 
@@ -161,6 +269,7 @@ async function loadData() {
     diaries.value = diaryData || [];
     emotionTrend.value = trendData || [];
     announcements.value = (announcementData || []).filter(isRecentAnnouncement);
+    loadReadAnnouncementIds();
     favorites.value = favoriteData || [];
     disclaimerVisible.value = true;
   } catch (requestError) {
@@ -172,7 +281,7 @@ async function loadData() {
 }
 
 async function createDiary(data) {
-  diaries.value.unshift(await diaryApi.create(data));
+  diaries.value = await diaryApi.list();
   emotionTrend.value = await diaryApi.trend('', '');
   notify('日记已保存');
 }
@@ -180,19 +289,89 @@ async function createDiary(data) {
 async function deleteDiary(diary) {
   await diaryApi.remove(diary.id);
   diaries.value = diaries.value.filter((item) => item.id !== diary.id);
+  diarySearchResults.value = diarySearchResults.value.filter((item) => item.id !== diary.id);
+  allDiaries.value = allDiaries.value.filter((item) => item.id !== diary.id);
+  allDiariesTotal.value = Math.max(allDiariesTotal.value - 1, 0);
+  emotionTrend.value = await diaryApi.trend('', '');
+  notify('日记已删除');
 }
 
-async function analyzeDiary(diary) {
-  const result = await diaryApi.analyze(diary.id);
-  notify(result.analysis || '分析已完成');
+async function updateDiary(diary, data) {
+  try {
+    const updated = await diaryApi.update(diary.id, data);
+    const index = diaries.value.findIndex((item) => item.id === diary.id);
+    if (index >= 0) {
+      diaries.value[index] = updated;
+    }
+    diarySearchResults.value = diarySearchResults.value.map((item) => (
+      item.id === diary.id ? updated : item
+    ));
+    allDiaries.value = allDiaries.value.map((item) => (
+      item.id === diary.id ? updated : item
+    ));
+    notify('日记已更新');
+  } catch (requestError) {
+    error.value = requestError.message;
+  }
+}
+
+async function loadAllDiaries(page = 0) {
+  allDiariesLoading.value = true;
+  try {
+    const result = await diaryApi.all(page, ALL_DIARIES_PAGE_SIZE);
+    allDiaries.value = result.items || [];
+    allDiariesPage.value = result.page || 0;
+    allDiariesTotalPages.value = result.totalPages || 0;
+    allDiariesTotal.value = result.total || 0;
+  } catch (requestError) {
+    notify(requestError.message, 3000);
+  } finally {
+    allDiariesLoading.value = false;
+  }
+}
+
+function openAllDiaries() {
+  allDiariesVisible.value = true;
+  loadAllDiaries(0);
+}
+
+function closeAllDiaries() {
+  allDiariesVisible.value = false;
+}
+
+function changeAllDiariesPage(page) {
+  loadAllDiaries(page);
 }
 
 async function refreshTrend(startDate, endDate) {
   try {
     emotionTrend.value = await diaryApi.trend(startDate, endDate);
+    const result = await diaryApi.all(0, 50, startDate, endDate);
+    diarySearchResults.value = result.items || [];
   } catch (requestError) {
-    error.value = requestError.message;
+    notify(requestError.message, 3000);
   }
+}
+
+async function analyzeDiary(diary) {
+  if (diaryAnalysisLoading.value) {
+    return;
+  }
+
+  diaryAnalysisLoading.value = true;
+  error.value = '';
+  try {
+    const result = await diaryApi.analyze(diary.id);
+    diaryAnalysis.value = result.analysis || '暂时没有生成分析内容，请稍后再试。';
+  } catch (requestError) {
+    error.value = requestError.message || 'AI 分析暂时不可用';
+  } finally {
+    diaryAnalysisLoading.value = false;
+  }
+}
+
+function closeDiaryAnalysis() {
+  diaryAnalysis.value = '';
 }
 
 async function openSession(session) {
@@ -208,13 +387,51 @@ async function createSession() {
   notify('已创建新会话');
 }
 
-async function deleteSession(session) {
-  await chatApi.remove(session.id);
+async function archiveSession(session) {
+  await chatApi.archive(session.id);
   sessions.value = sessions.value.filter((item) => item.id !== session.id);
 
   if (currentSessionId.value === session.id) {
     currentSessionId.value = null;
     messages.value = [];
+  }
+}
+
+async function openArchivedSessions() {
+  archivedSessionsLoading.value = true;
+  error.value = '';
+  try {
+    archivedSessions.value = await chatApi.archived();
+    archivedSessionsVisible.value = true;
+  } catch (requestError) {
+    error.value = requestError.message;
+  } finally {
+    archivedSessionsLoading.value = false;
+  }
+}
+
+async function unarchiveSession(session) {
+  try {
+    const restored = await chatApi.unarchive(session.id);
+    archivedSessions.value = archivedSessions.value.filter((item) => item.id !== session.id);
+    sessions.value = [restored, ...sessions.value];
+    notify('会话已取消归档');
+  } catch (requestError) {
+    error.value = requestError.message;
+  }
+}
+
+async function deleteArchivedSession(session) {
+  if (!window.confirm('永久删除后将无法恢复，确定删除这个会话吗？')) {
+    return;
+  }
+
+  try {
+    await chatApi.remove(session.id);
+    archivedSessions.value = archivedSessions.value.filter((item) => item.id !== session.id);
+    notify('会话已永久删除');
+  } catch (requestError) {
+    error.value = requestError.message;
   }
 }
 
@@ -224,6 +441,18 @@ async function renameSession(session, name) {
   if (index >= 0) {
     sessions.value[index] = updated;
   }
+}
+
+async function togglePinSession(session) {
+  const updated = await chatApi.togglePin(session.id);
+  sessions.value = sessions.value
+    .map((item) => (item.id === session.id ? updated : item))
+    .sort((left, right) => {
+      if (left.pinned !== right.pinned) {
+        return Number(right.pinned) - Number(left.pinned);
+      }
+      return new Date(right.latestMessageAt) - new Date(left.latestMessageAt);
+    });
 }
 
 async function clearContext(sessionId) {
@@ -343,9 +572,9 @@ async function startAssessment(scale) {
   selectedScale.value = await assessmentApi.detail(scale.id);
   const answers = {};
   selectedScale.value.questions.forEach((question) => {
-    answers[question.id] = question.type === 'MULTIPLE' ? [] : '';
+    answers[question.id] = question.type === 'MULTIPLE' ? [] : question.type === 'MATRIX' ? {} : '';
   });
-  report.value = { answers };
+  report.value = { answers, otherAnswers: {} };
   assessmentAnalysisLoading.value = false;
 }
 
@@ -356,9 +585,12 @@ async function submitAssessment() {
       return { questionId: question.id, textAnswer: value };
     }
     if (question.type === 'MULTIPLE') {
-      return { questionId: question.id, optionIds: value };
+      return { questionId: question.id, optionIds: value, otherAnswer: report.value.otherAnswers?.[question.id] || null };
     }
-    return { questionId: question.id, optionId: Number(value) };
+    if (question.type === 'MATRIX') {
+      return { questionId: question.id, matrixAnswers: value };
+    }
+    return { questionId: question.id, optionId: Number(value), otherAnswer: report.value.otherAnswers?.[question.id] || null };
   });
 
   report.value = await assessmentApi.submit({
@@ -407,6 +639,18 @@ async function saveProfile(data) {
   }
 }
 
+async function uploadAvatar(file) {
+  avatarUploading.value = true;
+  try {
+    profile.value = await userApi.uploadAvatar(file);
+    notify('头像已更新');
+  } catch (requestError) {
+    error.value = requestError.message;
+  } finally {
+    avatarUploading.value = false;
+  }
+}
+
 async function changePassword(data) {
   try {
     await userApi.updatePassword(data);
@@ -419,12 +663,16 @@ async function changePassword(data) {
 onMounted(() => {
   window.addEventListener('mh-auth-expired', handleAuthExpired);
   document.addEventListener('click', closeProfileMenu);
+  window.addEventListener('keydown', handleAnnouncementKeydown);
+  announcementPollingId = window.setInterval(refreshAnnouncements, ANNOUNCEMENT_POLL_INTERVAL);
   loadData();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener('mh-auth-expired', handleAuthExpired);
   document.removeEventListener('click', closeProfileMenu);
+  window.removeEventListener('keydown', handleAnnouncementKeydown);
+  window.clearInterval(announcementPollingId);
 });
 </script>
 
@@ -455,34 +703,20 @@ onBeforeUnmount(() => {
           <h1>{{ titles[active] }}</h1>
         </div>
         <div v-if="profile" class="header-actions">
-          <div class="announcement-menu-wrap">
+          <div>
             <button
               class="notification-trigger"
               type="button"
               aria-label="查看系统公告"
-              :aria-expanded="announcementPanelOpen"
+              :aria-expanded="announcementModalOpen"
               aria-haspopup="dialog"
-              @click="toggleAnnouncementPanel"
+              @click="toggleAnnouncementModal"
             >
               <Bell :size="19" />
-              <span v-if="announcements.length" class="notification-badge">
-                {{ announcements.length > 99 ? '99+' : announcements.length }}
+              <span v-if="unreadAnnouncementCount" class="notification-badge">
+                {{ unreadAnnouncementCount > 99 ? '99+' : unreadAnnouncementCount }}
               </span>
             </button>
-            <div v-if="announcementPanelOpen" class="announcement-panel" role="dialog" aria-label="系统公告">
-              <div class="announcement-panel-head">
-                <strong>系统公告</strong>
-                <span>{{ announcements.length }} 条</span>
-              </div>
-              <div v-if="!announcements.length" class="announcement-empty">
-                暂无系统公告
-              </div>
-              <article v-for="announcement in announcements" :key="announcement.id" class="announcement-item">
-                <strong>{{ announcement.title }}</strong>
-                <p>{{ announcement.content }}</p>
-                <time>{{ announcement.createdAt || '' }}</time>
-              </article>
-            </div>
           </div>
           <div class="profile-menu-wrap">
             <button
@@ -492,7 +726,8 @@ onBeforeUnmount(() => {
               aria-haspopup="menu"
               @click="toggleProfileMenu"
             >
-              <span class="avatar">{{ profile.nickname?.slice(0, 1) }}</span>
+              <img v-if="profile.avatarUrl" class="avatar profile-avatar-image" :src="`/api/v1${profile.avatarUrl}`" alt="用户头像" />
+              <span v-else class="avatar">{{ profile.nickname?.slice(0, 1) || 'U' }}</span>
               <span>{{ profile.nickname }}</span>
               <UserRound :size="16" />
             </button>
@@ -521,8 +756,9 @@ onBeforeUnmount(() => {
         :disclaimer-visible="disclaimerVisible"
         @create="createSession"
         @open="openSession"
-        @delete="deleteSession"
+        @archive="archiveSession"
         @rename="renameSession"
+        @pin="togglePinSession"
         @clear="clearContext"
         @send="sendMessage"
         @mode="updateChatMode"
@@ -552,25 +788,45 @@ onBeforeUnmount(() => {
         v-else-if="active === 'diary'"
         :diaries="diaries"
         :trend="emotionTrend"
+        :search-results="diarySearchResults"
+        :analysis-loading="diaryAnalysisLoading"
+        :all-visible="allDiariesVisible"
+        :all-diaries="allDiaries"
+        :all-loading="allDiariesLoading"
+        :all-page="allDiariesPage"
+        :all-total-pages="allDiariesTotalPages"
+        :all-total="allDiariesTotal"
         @create="createDiary"
         @delete="deleteDiary"
+        @update="updateDiary"
         @analyze="analyzeDiary"
         @trend="refreshTrend"
+        @open-all="openAllDiaries"
+        @close-all="closeAllDiaries"
+        @all-page="changeAllDiariesPage"
       />
       <AdminView
         v-else-if="active === 'admin' && profile?.role === 'ADMIN'"
         :section="adminSection"
       />
-      <section v-else-if="active === 'settings'" class="content settings-placeholder">
-        <Settings :size="28" />
-        <h2>设置</h2>
-        <p>设置功能暂未开放。</p>
-      </section>
+      <SettingsView
+        v-else-if="active === 'settings'"
+        class="settings-view"
+        :archived-sessions="archivedSessions"
+        :archived-visible="archivedSessionsVisible"
+        :loading="archivedSessionsLoading"
+        @open-archived="openArchivedSessions"
+        @back="archivedSessionsVisible = false"
+        @unarchive="unarchiveSession"
+        @delete="deleteArchivedSession"
+      />
       <ProfileView
         v-else
         :profile="profile"
+        :avatar-uploading="avatarUploading"
         @save-profile="saveProfile"
         @change-password="changePassword"
+        @upload-avatar="uploadAvatar"
       />
     </main>
 
@@ -578,6 +834,140 @@ onBeforeUnmount(() => {
       :visible="disclaimerVisible"
       @close="acknowledgeDisclaimer"
     />
+    <div
+      v-if="announcementModalOpen"
+      class="announcement-modal-backdrop"
+      role="presentation"
+      @click.self="closeAnnouncementModal"
+    >
+      <section
+        class="announcement-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="announcement-modal-title"
+      >
+        <div class="announcement-modal-head">
+          <div>
+            <span class="eyebrow">LATEST UPDATES</span>
+            <h2 id="announcement-modal-title">系统公告</h2>
+          </div>
+          <button
+            class="icon"
+            type="button"
+            aria-label="关闭系统公告"
+            title="关闭"
+            @click="closeAnnouncementModal"
+          >
+            <X :size="19" />
+          </button>
+        </div>
+        <div v-if="!announcements.length" class="announcement-empty">
+          暂无系统公告
+        </div>
+        <div v-else class="announcement-modal-list">
+          <article
+            v-for="announcement in announcements"
+            :key="announcement.id"
+            class="announcement-card"
+            role="button"
+            tabindex="0"
+            @click="openAnnouncementDetail(announcement)"
+            @keydown="handleAnnouncementCardKeydown($event, announcement)"
+          >
+            <div class="announcement-card-marker" aria-hidden="true" />
+            <div class="announcement-card-body">
+              <div class="announcement-card-meta">
+                <span>系统通知</span>
+                <time>{{ formatDateTime(announcement.createdAt) }}</time>
+              </div>
+              <h3>{{ announcement.title }}</h3>
+              <p class="announcement-card-preview">{{ announcement.content }}</p>
+            </div>
+          </article>
+        </div>
+        <div class="announcement-modal-foot">
+          <span>仅显示最近 10 天的公告</span>
+          <div class="announcement-modal-foot-actions">
+            <button class="secondary" type="button" @click="markAnnouncementsRead">全部标为已读</button>
+            <button class="primary-button" type="button" @click="closeAnnouncementModal">知道了</button>
+          </div>
+        </div>
+      </section>
+    </div>
+    <div
+      v-if="selectedAnnouncement"
+      class="announcement-detail-backdrop"
+      role="presentation"
+      @click.self="closeAnnouncementDetail"
+    >
+      <section
+        class="announcement-detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="announcement-detail-title"
+      >
+        <div class="announcement-detail-head">
+          <div>
+            <span class="eyebrow">SYSTEM NOTICE</span>
+            <h2 id="announcement-detail-title">{{ selectedAnnouncement.title }}</h2>
+          </div>
+          <button
+            class="icon"
+            type="button"
+            aria-label="关闭公告详情"
+            title="关闭"
+            @click="closeAnnouncementDetail"
+          >
+            <X :size="19" />
+          </button>
+        </div>
+        <time class="announcement-detail-time">
+          {{ formatDateTime(selectedAnnouncement.createdAt) }}
+        </time>
+        <div class="announcement-detail-content">
+          <p>{{ selectedAnnouncement.content }}</p>
+        </div>
+        <div class="announcement-detail-actions">
+          <button class="primary-button" type="button" @click="closeAnnouncementDetail">返回公告列表</button>
+        </div>
+      </section>
+    </div>
+    <div
+      v-if="diaryAnalysis"
+      class="analysis-modal-backdrop"
+      role="presentation"
+      @click.self="closeDiaryAnalysis"
+    >
+      <section
+        class="analysis-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="diary-analysis-title"
+      >
+        <div class="analysis-modal-head">
+          <div>
+            <span class="eyebrow">PERSONAL INSIGHT</span>
+            <h2 id="diary-analysis-title">日记 AI 分析</h2>
+          </div>
+          <button
+            class="icon"
+            type="button"
+            aria-label="关闭日记 AI 分析"
+            title="关闭"
+            @click="closeDiaryAnalysis"
+          >
+            <X :size="19" />
+          </button>
+        </div>
+        <div class="analysis-modal-content">
+          <p>{{ diaryAnalysis }}</p>
+        </div>
+        <div class="analysis-modal-actions">
+          <span>内容仅供自我觉察参考，不构成医学诊断。</span>
+          <button class="primary-button" type="button" @click="closeDiaryAnalysis">知道了</button>
+        </div>
+      </section>
+    </div>
     <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
   <div v-else class="loading-state">正在验证登录状态...</div>
