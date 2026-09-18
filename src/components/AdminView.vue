@@ -119,6 +119,17 @@ async function applyUserStatus(user, status) {
   user.status = (await adminApi.updateUserStatus(user.id, status)).status;
 }
 
+/** 用户状态展示文案，已注销账号仍保留业务数据可查。 */
+function statusLabel(status) {
+  if (status === 'CLOSED') {
+    return '已注销';
+  }
+  if (status === 'DISABLED') {
+    return '已禁用';
+  }
+  return '正常';
+}
+
 async function toggleUser(user) {
   if (user.status !== 'ACTIVE') {
     try {
@@ -872,6 +883,7 @@ function destroyOverviewChart() {
 
 onMounted(() => {
   load();
+  loadSectionData(props.section);
   window.addEventListener('resize', resizeOverviewChart);
 });
 
@@ -1479,6 +1491,9 @@ onBeforeUnmount(() => {
             <option value="ANNOUNCEMENT">系统公告</option>
             <option value="USER">用户状态</option>
             <option value="NOTIFICATION">通知推送</option>
+            <option value="SENSITIVE_WORD">敏感词规则</option>
+            <option value="FEEDBACK">反馈工单</option>
+            <option value="SYSTEM_SETTING">系统设置</option>
           </select>
         </label>
         <label>
@@ -1561,14 +1576,3 @@ onBeforeUnmount(() => {
     @cancel="cancelConfirm"
   />
 </template>
-/** 用户状态展示文案，已注销账号仍保留业务数据可查。 */
-function statusLabel(status) {
-  if (status === 'CLOSED') {
-    return '已注销';
-  }
-  if (status === 'DISABLED') {
-    return '已禁用';
-  }
-  return '正常';
-}
- async function applyUserStatus(user, status) {

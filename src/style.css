@@ -144,10 +144,10 @@ main.settings-layout > header {
 .primary { background: #dba95d; color: #173a3a; }
 .small { padding: 8px 11px; font-size: 13px; }
 .session-panel { min-height: 0; overflow-y: auto; border-right: 1px solid #dfe8e2; padding-right: 24px; }
-.session-panel .panel-head { position: sticky; top: 0; z-index: 2; margin: 0 -1px 12px 0; padding: 0 0 12px; background: #f5f7f5; box-shadow: 0 8px 10px -10px #173a3a; }
+.session-panel .panel-head { position: sticky; top: 0; z-index: 2; margin: 0 -1px 12px 0; padding: 0 0 12px; background: transparent; box-shadow: none; }
 .session-panel .panel-head .primary { background: transparent; color: #285858; }
 .session-panel .panel-head .primary:hover { background: #e5f0e9; }
-.session-panel .panel-head .primary:not(.disclaimer-open) { background: #e4b86a; color: #173a3a; }
+.session-panel .panel-head .primary:not(.disclaimer-open) { background: transparent; color: #285858; }
 .session-panel .panel-head .primary.disclaimer-open { background: transparent; }
 .chat-layout.disclaimer-open .session-panel .panel-head { background: transparent; box-shadow: none; }
 .session-row { position: relative; display: flex; align-items: center; border-bottom: 1px solid #dfe8e2; }

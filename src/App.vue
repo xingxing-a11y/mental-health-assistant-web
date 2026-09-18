@@ -137,6 +137,62 @@ const titles = {
   admin: '管理后台',
 };
 
+const routeDefinitions = {
+  '/chat': { active: 'chat' },
+  '/assessment': { active: 'assessment' },
+  '/articles': { active: 'articles' },
+  '/diary': { active: 'diary' },
+  '/relax': { active: 'relax', section: 'breathe' },
+  '/extras': { active: 'extras', section: 'compare' },
+  '/profile': { active: 'profile' },
+  '/settings': { active: 'settings' },
+  '/admin': { active: 'admin', section: 'overview' },
+};
+
+function navigate(path) {
+  if (window.location.pathname !== path) {
+    window.history.pushState({}, '', path);
+  }
+}
+
+function applyLocation() {
+  const path = window.location.pathname.toLowerCase();
+  const adminMatch = path.match(/^\/admin\/(.+)$/);
+  const adminSections = ['overview', 'users', 'scales', 'articles', 'knowledge',
+    'announcements', 'push', 'sensitive', 'feedbacks', 'logs'];
+  if (adminMatch && adminSections.includes(adminMatch[1])) {
+    active.value = 'admin';
+    adminSection.value = adminMatch[1];
+    return;
+  }
+
+  const relaxMatch = path.match(/^\/relax\/(.+)$/);
+  if (relaxMatch && ['breathe', 'meditation', 'stress'].includes(relaxMatch[1])) {
+    active.value = 'relax';
+    relaxSection.value = relaxMatch[1];
+    return;
+  }
+
+  const extrasMatch = path.match(/^\/extras\/(.+)$/);
+  if (extrasMatch && ['compare', 'favorites', 'recommendations'].includes(extrasMatch[1])) {
+    active.value = 'extras';
+    extrasSection.value = extrasMatch[1];
+    return;
+  }
+
+  const definition = routeDefinitions[path] || routeDefinitions['/chat'];
+  active.value = definition.active;
+  if (definition.section && definition.active === 'relax') {
+    relaxSection.value = definition.section;
+  }
+  if (definition.section && definition.active === 'extras') {
+    extrasSection.value = definition.section;
+  }
+  if (!routeDefinitions[path]) {
+    window.history.replaceState({}, '', '/chat');
+  }
+}
+
 function notify(message, duration = 1800) {
   toast.value = message;
   window.setTimeout(() => {
@@ -206,6 +262,18 @@ function handleLoginSuccess() {
 
 function selectModule(module) {
   active.value = module;
+  const moduleRoutes = {
+    chat: '/chat',
+    assessment: '/assessment',
+    articles: '/articles',
+    diary: '/diary',
+    relax: '/relax',
+    extras: '/extras',
+    profile: '/profile',
+    settings: '/settings',
+    admin: '/admin',
+  };
+  navigate(moduleRoutes[module] || '/chat');
   mobileOpen.value = false;
   profileMenuOpen.value = false;
   announcementModalOpen.value = false;
@@ -217,6 +285,7 @@ function selectModule(module) {
 function selectAdminSection(section) {
   active.value = 'admin';
   adminSection.value = section;
+  navigate(`/admin/${section}`);
   mobileOpen.value = false;
   profileMenuOpen.value = false;
   announcementModalOpen.value = false;
@@ -225,6 +294,7 @@ function selectAdminSection(section) {
 function selectRelaxSection(section) {
   active.value = 'relax';
   relaxSection.value = section;
+  navigate(`/relax/${section}`);
   mobileOpen.value = false;
   profileMenuOpen.value = false;
   announcementModalOpen.value = false;
@@ -233,6 +303,7 @@ function selectRelaxSection(section) {
 function selectExtrasSection(section) {
   active.value = 'extras';
   extrasSection.value = section;
+  navigate(`/extras/${section}`);
   mobileOpen.value = false;
   profileMenuOpen.value = false;
   announcementModalOpen.value = false;
@@ -311,6 +382,7 @@ function handleAnnouncementCardKeydown(event, announcement) {
 
 function selectProfileMenu(module) {
   active.value = module;
+  navigate(module === 'settings' ? '/settings' : '/profile');
   profileMenuOpen.value = false;
   if (module === 'settings') {
     archivedSessionsVisible.value = false;
@@ -1060,6 +1132,7 @@ async function startScaleFromExtras(scaleId) {
   try {
     await startAssessment({ id: scaleId });
     active.value = 'assessment';
+    navigate('/assessment');
   } catch (requestError) {
     error.value = requestError.message;
   }
@@ -1073,6 +1146,8 @@ function refreshBellCounters() {
 watch(userSettings, (settings) => applyAppearance(settings));
 
 onMounted(() => {
+  applyLocation();
+  window.addEventListener('popstate', applyLocation);
   window.addEventListener('mh-auth-expired', handleAuthExpired);
   document.addEventListener('click', closeProfileMenu);
   window.addEventListener('keydown', handleAnnouncementKeydown);
@@ -1081,6 +1156,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  window.removeEventListener('popstate', applyLocation);
   window.removeEventListener('mh-auth-expired', handleAuthExpired);
   document.removeEventListener('click', closeProfileMenu);
   window.removeEventListener('keydown', handleAnnouncementKeydown);
