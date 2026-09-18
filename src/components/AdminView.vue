@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts';
 import { formatDateTime } from '../utils/dateTime';
 import { adminApi, assessmentApi } from '../api/modules';
+import ConfirmDialog from './ConfirmDialog.vue';
 
 const props = defineProps({
   section: { type: String, default: 'overview' },
@@ -32,6 +33,25 @@ const editingAnnouncementId = ref(null);
 const articleForm = ref({ title: '', summary: '', content: '' });
 const editingArticleId = ref(null);
 const expandedEditorTarget = ref(null);
+const pendingConfirm = ref(null);
+const confirmBusy = ref(false);
+let errorTimer = null;
+
+const notifications = ref([]);
+const notificationPage = ref({ page: 0, size: 20, total: 0, totalPages: 0 });
+const notificationForm = ref({ scope: 'ALL', userId: '', title: '', content: '', permanent: false });
+const sensitiveWords = ref([]);
+const sensitiveWordForm = ref({ word: '', level: 'CARE', enabled: true });
+const editingSensitiveWordId = ref(null);
+const feedbacks = ref([]);
+const feedbackPage = ref({ page: 0, size: 20, total: 0, totalPages: 0 });
+const feedbackStatusFilter = ref('');
+const operationLogs = ref([]);
+const operationLogPage = ref({ page: 0, size: 20, total: 0, totalPages: 0 });
+const operationLogTypeFilter = ref('');
+const operationLogForm = ref({ startDate: '', endDate: '' });
+const knowledgeSettings = ref({ chunkSize: 1000, chunkOverlap: 100 });
+const knowledgeSettingsSaving = ref(false);
 
 const expandedEditorTitle = computed(() => {
   if (expandedEditorTarget.value === 'scaleDescription') {
@@ -65,7 +85,15 @@ const expandedEditorContent = computed({
 
 async function load() {
   try {
-    const [userResult, documentResult, scaleResult, articleResult, auditResult, statsResult, announcementResult] = await Promise.all([
+    const [
+      userResult,
+      documentResult,
+      scaleResult,
+      articleResult,
+      auditResult,
+      statsResult,
+      announcementResult,
+    ] = await Promise.all([
       adminApi.users(userPage.value.page, userPage.value.size, userKeyword.value),
       adminApi.documents(),
       adminApi.scales(),
@@ -83,13 +111,31 @@ async function load() {
     statistics.value = statsResult || null;
     announcements.value = announcementResult || [];
   } catch (requestError) {
-    error.value = requestError.message;
+    setError(requestError.message);
   }
 }
 
-async function toggleUser(user) {
-  const status = user.status === 'ACTIVE' ? 'DISABLED' : 'ACTIVE';
+async function applyUserStatus(user, status) {
   user.status = (await adminApi.updateUserStatus(user.id, status)).status;
+}
+
+async function toggleUser(user) {
+  if (user.status !== 'ACTIVE') {
+    try {
+      await applyUserStatus(user, 'ACTIVE');
+    } catch (requestError) {
+      setError(requestError.message || '用户状态更新失败');
+    }
+    return;
+  }
+
+  askConfirm({
+    title: '禁用账号',
+    message: `确定禁用账号「${user.username}」吗？禁用后该用户无法再登录，需要重新启用后才能继续使用。`,
+    confirmText: '禁用账号',
+    errorMessage: '用户状态更新失败',
+    action: () => applyUserStatus(user, 'DISABLED'),
+  });
 }
 
 async function changeUserPage(page) {
@@ -120,7 +166,7 @@ async function vectorize(document) {
 
 async function saveDocument() {
   if (!documentForm.value.title.trim() || !documentForm.value.content.trim()) {
-    error.value = '文档标题和正文不能为空';
+    setError('文档标题和正文不能为空');
     return;
   }
   saving.value = true;
@@ -140,7 +186,7 @@ async function saveDocument() {
     documentForm.value = { title: '', content: '' };
     editingId.value = null;
   } catch (requestError) {
-    error.value = requestError.message || '知识库文档保存失败';
+    setError(requestError.message || '知识库文档保存失败');
     if (requestError.message === '知识库文档不存在') {
       editingId.value = null;
     }
@@ -154,14 +200,29 @@ function editDocument(document) {
   documentForm.value = { title: document.title, content: document.content || '' };
 }
 
-async function deleteDocument(document) {
+function cancelDocumentEdit() {
+  editingId.value = null;
+  documentForm.value = { title: '', content: '' };
+}
+
+async function removeDocument(document) {
   await adminApi.deleteDocument(document.id);
   documents.value = documents.value.filter((item) => item.id !== document.id);
 }
 
+function deleteDocument(document) {
+  askConfirm({
+    title: '删除知识库文档',
+    message: `确定删除《${document.title}》吗？文档记录与已生成的向量片段会一并删除，且无法恢复。`,
+    confirmText: '删除文档',
+    errorMessage: '知识库文档删除失败',
+    action: () => removeDocument(document),
+  });
+}
+
 async function saveScale() {
   if (!scaleForm.value.name.trim()) {
-    error.value = '量表名称不能为空';
+    setError('量表名称不能为空');
     return;
   }
   const saved = editingScaleId.value
@@ -177,6 +238,18 @@ async function saveScale() {
   editingScaleId.value = null;
 }
 
+async function publishScale(scale) {
+  try {
+    const published = await adminApi.publishScale(scale.id);
+    const index = scales.value.findIndex((item) => item.id === scale.id);
+    if (index !== -1) {
+      scales.value[index] = published;
+    }
+  } catch (err) {
+    setError(err.message || '发布失败，请先添加题目');
+  }
+}
+
 function editScale(scale) {
   editingScaleId.value = scale.id;
   scaleForm.value = {
@@ -186,14 +259,39 @@ function editScale(scale) {
   };
 }
 
-async function deleteScale(scale) {
+function cancelScaleEdit() {
+  editingScaleId.value = null;
+  scaleForm.value = { name: '', description: '', applicableScene: '' };
+}
+
+async function removeScale(scale) {
   await adminApi.deleteScale(scale.id);
   scales.value = scales.value.filter((item) => item.id !== scale.id);
 }
 
-async function deleteArticle(article) {
+function deleteScale(scale) {
+  askConfirm({
+    title: '删除量表',
+    message: `确定删除量表「${scale.name}」吗？该量表的题目和选项会一并删除，且无法恢复；若该量表已有测评记录，后端会拒绝删除。`,
+    confirmText: '删除量表',
+    errorMessage: '量表删除失败',
+    action: () => removeScale(scale),
+  });
+}
+
+async function removeArticle(article) {
   await adminApi.deleteArticle(article.id);
   articles.value = articles.value.filter((item) => item.id !== article.id);
+}
+
+function deleteArticle(article) {
+  askConfirm({
+    title: '删除科普文章',
+    message: `确定删除《${article.title}》吗？删除后用户将无法再看到这篇文章，且无法恢复。`,
+    confirmText: '删除文章',
+    errorMessage: '科普文章删除失败',
+    action: () => removeArticle(article),
+  });
 }
 
 function editArticle(article) {
@@ -216,6 +314,269 @@ function openExpandedEditor(target) {
 
 function closeExpandedEditor() {
   expandedEditorTarget.value = null;
+}
+
+function setError(message) {
+  error.value = message;
+  // 清除之前的定时器
+  if (errorTimer) {
+    clearTimeout(errorTimer);
+  }
+  // 设置新的定时器，3秒后自动清除
+  errorTimer = setTimeout(() => {
+    error.value = '';
+    errorTimer = null;
+  }, 3000);
+}
+
+async function loadNotifications(page = 0) {
+  try {
+    const result = await adminApi.notifications(page, notificationPage.value.size);
+    notifications.value = result.items || [];
+    notificationPage.value = result;
+  } catch (requestError) {
+    setError(requestError.message);
+  }
+}
+
+async function pushNotification() {
+  const form = notificationForm.value;
+  if (!form.title.trim() || !form.content.trim()) {
+    setError('请填写推送标题与内容');
+    return;
+  }
+  if (form.scope === 'USER' && !form.userId) {
+    setError('定向推送需要填写目标用户 ID');
+    return;
+  }
+
+  try {
+    await adminApi.pushNotification({
+      scope: form.scope,
+      userId: form.scope === 'USER' ? Number(form.userId) : null,
+      title: form.title.trim(),
+      content: form.content.trim(),
+      permanent: form.permanent,
+    });
+    notificationForm.value = { scope: 'ALL', userId: '', title: '', content: '', permanent: false };
+    await loadNotifications(0);
+  } catch (requestError) {
+    setError(requestError.message);
+  }
+}
+
+function changeNotificationPage(page) {
+  if (page < 0 || page >= notificationPage.value.totalPages) {
+    return;
+  }
+  loadNotifications(page);
+}
+
+function revokeNotification(notification) {
+  askConfirm({
+    title: '撤回推送',
+    message: `撤回「${notification.title}」后，用户将不再看到该通知，已读记录会一并删除。`,
+    confirmText: '撤回推送',
+    errorMessage: '撤回推送失败',
+    action: async () => {
+      await adminApi.revokeNotification(notification.id);
+      await loadNotifications(notificationPage.value.page);
+    },
+  });
+}
+
+async function loadSensitiveWords() {
+  try {
+    sensitiveWords.value = await adminApi.sensitiveWords() || [];
+  } catch (requestError) {
+    setError(requestError.message);
+  }
+}
+
+async function saveSensitiveWord() {
+  const form = sensitiveWordForm.value;
+  if (!form.word.trim()) {
+    setError('请填写敏感词');
+    return;
+  }
+
+  const payload = { word: form.word.trim(), level: form.level, enabled: form.enabled };
+  try {
+    if (editingSensitiveWordId.value) {
+      await adminApi.updateSensitiveWord(editingSensitiveWordId.value, payload);
+    } else {
+      await adminApi.createSensitiveWord(payload);
+    }
+    cancelSensitiveWordEdit();
+    await loadSensitiveWords();
+  } catch (requestError) {
+    setError(requestError.message);
+  }
+}
+
+function editSensitiveWord(item) {
+  editingSensitiveWordId.value = item.id;
+  sensitiveWordForm.value = { word: item.word, level: item.level, enabled: item.enabled };
+}
+
+function cancelSensitiveWordEdit() {
+  editingSensitiveWordId.value = null;
+  sensitiveWordForm.value = { word: '', level: 'CARE', enabled: true };
+}
+
+function deleteSensitiveWord(item) {
+  askConfirm({
+    title: '删除词条',
+    message: `删除「${item.word}」后，该词条不再参与敏感内容判定。`,
+    confirmText: '删除词条',
+    errorMessage: '删除词条失败',
+    action: async () => {
+      await adminApi.deleteSensitiveWord(item.id);
+      await loadSensitiveWords();
+    },
+  });
+}
+
+async function loadFeedbacks(page = 0) {
+  try {
+    const result = await adminApi.feedbacks(page, feedbackPage.value.size, feedbackStatusFilter.value);
+    feedbacks.value = (result.items || []).map((item) => ({
+      ...item,
+      remarkDraft: item.remark || '',
+    }));
+    feedbackPage.value = result;
+  } catch (requestError) {
+    setError(requestError.message);
+  }
+}
+
+function searchFeedbacks() {
+  loadFeedbacks(0);
+}
+
+function changeFeedbackPage(page) {
+  if (page < 0 || page >= feedbackPage.value.totalPages) {
+    return;
+  }
+  loadFeedbacks(page);
+}
+
+async function handleFeedback(ticket, status) {
+  try {
+    const updated = await adminApi.handleFeedback(ticket.id, {
+      status,
+      remark: ticket.remarkDraft?.trim() || null,
+    });
+    const index = feedbacks.value.findIndex((item) => item.id === updated.id);
+    if (index >= 0) {
+      feedbacks.value[index] = { ...updated, remarkDraft: updated.remark || '' };
+    }
+  } catch (requestError) {
+    setError(requestError.message);
+  }
+}
+
+async function loadOperationLogs(page = 0) {
+  try {
+    const result = await adminApi.operationLogs({
+      page,
+      size: operationLogPage.value.size,
+      type: operationLogTypeFilter.value,
+      startDate: operationLogForm.value.startDate,
+      endDate: operationLogForm.value.endDate,
+    });
+    operationLogs.value = result.items || [];
+    operationLogPage.value = result;
+  } catch (requestError) {
+    setError(requestError.message);
+  }
+}
+
+function searchOperationLogs() {
+  loadOperationLogs(0);
+}
+
+function changeOperationLogPage(page) {
+  if (page < 0 || page >= operationLogPage.value.totalPages) {
+    return;
+  }
+  loadOperationLogs(page);
+}
+
+async function loadKnowledgeSettings() {
+  try {
+    knowledgeSettings.value = await adminApi.knowledgeSettings();
+  } catch (requestError) {
+    setError(requestError.message);
+  }
+}
+
+async function saveKnowledgeSettings() {
+  knowledgeSettingsSaving.value = true;
+  try {
+    knowledgeSettings.value = await adminApi.updateKnowledgeSettings({
+      chunkSize: Number(knowledgeSettings.value.chunkSize),
+      chunkOverlap: Number(knowledgeSettings.value.chunkOverlap),
+    });
+  } catch (requestError) {
+    setError(requestError.message);
+  } finally {
+    knowledgeSettingsSaving.value = false;
+  }
+}
+
+/** 新增子节的数据按需加载，避免每次进入后台都全量拉取。 */
+async function loadSectionData(section) {
+  if (section === 'push') {
+    await loadNotifications(0);
+  }
+  if (section === 'sensitive') {
+    await loadSensitiveWords();
+  }
+  if (section === 'feedbacks') {
+    await loadFeedbacks(0);
+  }
+  if (section === 'logs') {
+    await loadOperationLogs(0);
+  }
+  if (section === 'knowledge') {
+    await loadKnowledgeSettings();
+  }
+}
+
+/** 打开二次确认弹窗，用户确认后再执行具体操作。 */
+function askConfirm(options) {
+  pendingConfirm.value = {
+    title: options.title,
+    message: options.message,
+    confirmText: options.confirmText || '确认',
+    errorMessage: options.errorMessage || '操作失败，请稍后重试',
+    action: options.action,
+  };
+}
+
+function cancelConfirm() {
+  if (confirmBusy.value) {
+    return;
+  }
+  pendingConfirm.value = null;
+}
+
+async function runConfirmedAction() {
+  if (!pendingConfirm.value || confirmBusy.value) {
+    return;
+  }
+
+  const { action, errorMessage } = pendingConfirm.value;
+  confirmBusy.value = true;
+  try {
+    await action();
+  } catch (requestError) {
+    setError(requestError.message || errorMessage);
+  } finally {
+    confirmBusy.value = false;
+    pendingConfirm.value = null;
+  }
 }
 
 async function saveArticle() {
@@ -256,9 +617,24 @@ function editAnnouncement(announcement) {
   };
 }
 
-async function deleteAnnouncement(announcement) {
+function cancelAnnouncementEdit() {
+  editingAnnouncementId.value = null;
+  announcementForm.value = { title: '', content: '' };
+}
+
+async function removeAnnouncement(announcement) {
   await adminApi.deleteAnnouncement(announcement.id);
   announcements.value = announcements.value.filter((item) => item.id !== announcement.id);
+}
+
+function deleteAnnouncement(announcement) {
+  askConfirm({
+    title: '删除系统公告',
+    message: `确定删除公告「${announcement.title}」吗？删除后用户首页不再展示该公告，且无法恢复。`,
+    confirmText: '删除公告',
+    errorMessage: '系统公告删除失败',
+    action: () => removeAnnouncement(announcement),
+  });
 }
 
 async function editQuestions(scale) {
@@ -301,18 +677,29 @@ function removeQuestion(index) {
 function changeQuestionType(question) {
   if (question.type === 'TEXT') {
     question.options = [];
+    // 清空矩阵相关字段
+    question.matrixRows = '';
+    question.matrixColumns = '';
     return;
   }
 
   if (question.type === 'MATRIX') {
-    question.matrixRows = question.matrixRows || '项目一\n项目二';
-    question.matrixColumns = question.matrixColumns || '从不\n偶尔\n经常';
-    question.options = question.matrixColumns.split('\n').filter(Boolean)
-      .map((label, index) => ({ label, score: index }));
+    // 确保矩阵行和列有默认值
+    if (!question.matrixRows || !question.matrixRows.trim()) {
+      question.matrixRows = '项目一\n项目二';
+    }
+    if (!question.matrixColumns || !question.matrixColumns.trim()) {
+      question.matrixColumns = '从不\n偶尔\n经常';
+    }
+    // 从矩阵列创建选项
+    updateMatrixOptions(question);
     return;
   }
 
   if (question.type === 'JUDGE') {
+    // 清空矩阵相关字段
+    question.matrixRows = '';
+    question.matrixColumns = '';
     question.options = [
       { label: '正确', score: 1 },
       { label: '错误', score: 0 },
@@ -320,12 +707,31 @@ function changeQuestionType(question) {
     return;
   }
 
-  if (!question.options.length) {
+  // 对于 SINGLE 和 MULTIPLE 类型
+  // 清空矩阵相关字段
+  question.matrixRows = '';
+  question.matrixColumns = '';
+
+  // 如果没有选项或选项都来自矩阵类型，则重置为默认选项
+  if (!question.options.length || question.options.some(opt => ['从不', '偶尔', '经常'].includes(opt.label))) {
     question.options = [
       { label: '', score: 0 },
       { label: '', score: 0 },
     ];
   }
+}
+
+function updateMatrixOptions(question) {
+  if (question.type !== 'MATRIX') return;
+  // 从矩阵列创建选项，保留用户之前设置的分值
+  const columns = question.matrixColumns.split('\n').filter(Boolean);
+  question.options = columns.map((label, index) => {
+    const existingOption = question.options[index];
+    return {
+      label: label.trim(),
+      score: existingOption ? (Number(existingOption.score) || index) : index,
+    };
+  });
 }
 
 function addOption(question) {
@@ -349,29 +755,55 @@ function cancelQuestions() {
 
 async function saveQuestions() {
   if (questionForm.value.some((question) => !question.content.trim())) {
-    error.value = '题目内容不能为空';
+    setError('题目内容不能为空');
     return;
   }
-  if (questionForm.value.some((question) => question.type !== 'TEXT'
-      && question.options.every((option) => !option.label.trim()))) {
-    error.value = '选择题至少需要一个有效选项';
+  if (questionForm.value.some((question) => {
+    if (question.type === 'TEXT') return false;
+    if (question.type === 'MATRIX') {
+      return !question.matrixRows.trim() || !question.matrixColumns.trim();
+    }
+    return question.options.every((option) => !option.label.trim());
+  })) {
+    setError('选择题至少需要一个有效选项');
     return;
   }
-  const questions = questionForm.value.map((question) => ({
-    order: question.order,
-    content: question.content.trim(),
-    type: question.type,
-    matrixRows: question.type === 'MATRIX' ? question.matrixRows : null,
-    matrixColumns: question.type === 'MATRIX' ? question.matrixColumns : null,
-    options: question.type === 'TEXT'
-      ? []
-      : question.options
+
+  const questions = questionForm.value.map((question) => {
+    let finalOptions = [];
+    
+    if (question.type === 'TEXT') {
+      finalOptions = [];
+    } else if (question.type === 'MATRIX') {
+      // 对于矩阵题，直接从 matrixColumns 生成选项，并保留用户设置的分值
+      const columns = question.matrixColumns.split('\n').filter(Boolean);
+      finalOptions = columns.map((label, index) => {
+        const existingOption = question.options[index];
+        return {
+          label: label.trim(),
+          score: existingOption ? (Number(existingOption.score) || 0) : index,
+        };
+      });
+    } else {
+      // 其他题型使用用户编辑的选项
+      finalOptions = question.options
         .filter((option) => option.label.trim())
         .map((option) => ({
           label: option.label.trim(),
           score: Number(option.score) || 0,
-        })),
-  }));
+        }));
+    }
+
+    return {
+      order: question.order,
+      content: question.content.trim(),
+      type: question.type,
+      matrixRows: question.type === 'MATRIX' ? question.matrixRows : null,
+      matrixColumns: question.type === 'MATRIX' ? question.matrixColumns : null,
+      options: finalOptions,
+    };
+  });
+
   await adminApi.updateQuestions(questionScaleId.value, questions);
   questionScaleId.value = null;
   questionForm.value = [];
@@ -449,9 +881,21 @@ watch(
   { deep: true },
 );
 
+watch(
+  () => props.section,
+  (section) => {
+    loadSectionData(section);
+  },
+);
+
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeOverviewChart);
   destroyOverviewChart();
+  // 清除错误提示的定时器
+  if (errorTimer) {
+    clearTimeout(errorTimer);
+    errorTimer = null;
+  }
 });
 </script>
 
@@ -479,7 +923,7 @@ onBeforeUnmount(() => {
         />
         <div class="management-actions">
           <button class="primary-button" type="submit">{{ editingScaleId ? '保存修改' : '新增量表' }}</button>
-          <button v-if="editingScaleId" class="text-button" type="button" @click="editingScaleId = null">取消编辑</button>
+          <button v-if="editingScaleId" class="text-button" type="button" @click="cancelScaleEdit">取消编辑</button>
         </div>
       </form>
       <div v-if="!scales.length" class="empty-state">暂无量表。</div>
@@ -491,6 +935,13 @@ onBeforeUnmount(() => {
         </div>
         <div class="management-actions">
           <button class="secondary" type="button" @click="editQuestions(scale)">维护题目</button>
+          <button
+            v-if="!scale.published"
+            class="secondary publish-button"
+            type="button"
+            @click="publishScale(scale)"
+          >发布</button>
+          <span v-else class="status-chip status-success">已发布</span>
           <button class="text-button" type="button" @click="editScale(scale)">编辑</button>
           <button class="text-button danger-button" type="button" @click="deleteScale(scale)">删除</button>
         </div>
@@ -524,17 +975,39 @@ onBeforeUnmount(() => {
           </label>
           <div v-if="question.type !== 'TEXT'" class="option-editor">
             <div v-if="question.type === 'MATRIX'" class="matrix-editor-fields">
-              <label>矩阵行（每行一个项目）<textarea v-model="question.matrixRows" rows="3" /></label>
-              <label>矩阵列（每行一个选项）<textarea v-model="question.matrixColumns" rows="3" /></label>
+              <label>
+                矩阵行（每行一个项目）
+                <textarea v-model="question.matrixRows" rows="3" />
+              </label>
+              <label>
+                矩阵列（每行一个选项）
+                <textarea
+                  v-model="question.matrixColumns"
+                  rows="3"
+                  @input="updateMatrixOptions(question)"
+                />
+              </label>
+              <p class="matrix-hint">矩阵列会自动转换为选项，请直接编辑矩阵列内容</p>
             </div>
-            <div class="option-editor-head">
+            <div v-if="question.type !== 'MATRIX'" class="option-editor-head">
               <span>选项与分值</span>
               <button class="text-button" type="button" @click="addOption(question)">添加选项</button>
             </div>
-            <div v-for="(option, optionIndex) in question.options" :key="optionIndex" class="option-editor-row">
+            <div
+              v-if="question.type !== 'MATRIX'"
+              v-for="(option, optionIndex) in question.options"
+              :key="optionIndex"
+              class="option-editor-row"
+            >
               <input v-model="option.label" maxlength="500" placeholder="选项内容" />
               <input v-model.number="option.score" type="number" min="0" placeholder="分值" />
-              <button class="text-button danger-button" type="button" @click="removeOption(question, optionIndex)">删除</button>
+              <button
+                class="text-button danger-button"
+                type="button"
+                @click="removeOption(question, optionIndex)"
+              >
+                删除
+              </button>
             </div>
           </div>
           <p v-else class="question-type-hint">文字题由用户直接填写，不参与自动计分。</p>
@@ -612,7 +1085,7 @@ onBeforeUnmount(() => {
             v-if="editingAnnouncementId"
             class="text-button"
             type="button"
-            @click="editingAnnouncementId = null; announcementForm = { title: '', content: '' }"
+            @click="cancelAnnouncementEdit"
           >
             取消编辑
           </button>
@@ -702,15 +1175,42 @@ onBeforeUnmount(() => {
       <article v-for="user in users" :key="user.id" class="admin-row">
         <span>{{ user.username }}</span>
         <span>{{ user.nickname }}</span>
-        <span>{{ user.status }}</span>
-        <button class="secondary" type="button" @click="toggleUser(user)">
+        <span>
+          <span
+            class="status-chip"
+            :class="user.status === 'ACTIVE' ? 'status-success' : 'status-pending'"
+          >
+            {{ statusLabel(user.status) }}
+          </span>
+        </span>
+        <button
+          v-if="user.status !== 'CLOSED'"
+          class="secondary"
+          type="button"
+          @click="toggleUser(user)"
+        >
           {{ user.status === 'ACTIVE' ? '禁用' : '启用' }}
         </button>
+        <span v-else class="management-count">账号已注销</span>
       </article>
       <div v-if="userPage.totalPages > 1" class="pagination">
-        <button class="text-button" :disabled="userPage.page === 0" type="button" @click="changeUserPage(userPage.page - 1)">上一页</button>
+        <button
+          class="text-button"
+          :disabled="userPage.page === 0"
+          type="button"
+          @click="changeUserPage(userPage.page - 1)"
+        >
+          上一页
+        </button>
         <span>{{ userPage.page + 1 }} / {{ userPage.totalPages }}</span>
-        <button class="text-button" :disabled="userPage.page + 1 >= userPage.totalPages" type="button" @click="changeUserPage(userPage.page + 1)">下一页</button>
+        <button
+          class="text-button"
+          :disabled="userPage.page + 1 >= userPage.totalPages"
+          type="button"
+          @click="changeUserPage(userPage.page + 1)"
+        >
+          下一页
+        </button>
       </div>
     </div>
 
@@ -722,19 +1222,43 @@ onBeforeUnmount(() => {
         </div>
         <span class="management-count">{{ documents.length }} 份文档</span>
       </div>
+      <form class="admin-form management-form" @submit.prevent="saveKnowledgeSettings">
+        <h3>分片参数</h3>
+        <p class="question-type-hint">
+          统一设置向量化的分片大小与重叠长度，修改后需要重新向量化已有文档才会生效。
+        </p>
+        <label>
+          <span>分片大小（100 - 4000）</span>
+          <input v-model.number="knowledgeSettings.chunkSize" type="number" min="100" max="4000" />
+        </label>
+        <label>
+          <span>重叠长度（0 - 1000，且必须小于分片大小）</span>
+          <input v-model.number="knowledgeSettings.chunkOverlap" type="number" min="0" max="1000" />
+        </label>
+        <div class="management-actions">
+          <button class="primary-button" type="submit" :disabled="knowledgeSettingsSaving">
+            {{ knowledgeSettingsSaving ? '保存中...' : '保存分片参数' }}
+          </button>
+        </div>
+      </form>
       <form class="admin-form management-form" @submit.prevent="saveDocument">
         <input v-model="documentForm.title" placeholder="文档标题" />
         <textarea v-model="documentForm.content" placeholder="文档正文" rows="4" />
         <div class="management-actions">
-          <button class="primary-button" :disabled="saving" type="submit">{{ saving ? '保存中...' : editingId ? '保存修改' : '新增文档' }}</button>
-          <button v-if="editingId" class="text-button" type="button" @click="editingId = null">取消编辑</button>
+          <button class="primary-button" :disabled="saving" type="submit">
+            {{ saving ? '保存中...' : editingId ? '保存修改' : '新增文档' }}
+          </button>
+          <button v-if="editingId" class="text-button" type="button" @click="cancelDocumentEdit">取消编辑</button>
         </div>
       </form>
       <div v-if="!documents.length" class="empty-state">暂无知识库文档。</div>
       <article v-for="document in documents" :key="document.id" class="management-item">
         <div class="management-item-copy">
           <strong>{{ document.title }}</strong>
-          <span class="status-chip" :class="document.vectorStatus === 'VECTORIZED' ? 'status-success' : 'status-pending'">
+          <span
+            class="status-chip"
+            :class="document.vectorStatus === 'VECTORIZED' ? 'status-success' : 'status-pending'"
+          >
             {{ document.vectorStatus === 'VECTORIZED' ? '已向量化' : '待向量化' }}
           </span>
         </div>
@@ -746,6 +1270,263 @@ onBeforeUnmount(() => {
           <button class="text-button danger-button" type="button" @click="deleteDocument(document)">删除</button>
         </div>
       </article>
+    </div>
+    <div v-if="props.section === 'push'" class="admin-section management-section">
+      <div class="management-heading">
+        <div>
+          <h2>通知推送</h2>
+          <p>推送心理小贴士；未勾选永不过期时，通知默认 30 天后自动隐藏。</p>
+        </div>
+        <span class="management-count">{{ notificationPage.total || 0 }} 条推送记录</span>
+      </div>
+      <form class="admin-form management-form" @submit.prevent="pushNotification">
+        <h3>新建推送</h3>
+        <label>
+          <span>推送范围</span>
+          <select v-model="notificationForm.scope">
+            <option value="ALL">全部用户</option>
+            <option value="USER">指定用户</option>
+          </select>
+        </label>
+        <label v-if="notificationForm.scope === 'USER'">
+          <span>目标用户 ID</span>
+          <input v-model="notificationForm.userId" inputmode="numeric" />
+        </label>
+        <label>
+          <span>标题（最多 200 字）</span>
+          <input v-model="notificationForm.title" maxlength="200" />
+        </label>
+        <label>
+          <span>内容（最多 2000 字）</span>
+          <textarea v-model="notificationForm.content" maxlength="2000" rows="4" />
+        </label>
+        <label class="admin-checkbox">
+          <input v-model="notificationForm.permanent" type="checkbox" />
+          <span>永不过期</span>
+        </label>
+        <div class="management-actions">
+          <button class="primary-button" type="submit">推送通知</button>
+        </div>
+      </form>
+      <div v-if="!notifications.length" class="empty-state">暂无推送记录。</div>
+      <article v-for="notification in notifications" :key="notification.id" class="management-item">
+        <div class="management-item-copy">
+          <strong>{{ notification.title }}</strong>
+          <span>
+            {{ notification.scope === 'ALL' ? '全部用户' : '指定用户' }} ·
+            {{ notification.expireAt ? '过期时间 ' + formatDateTime(notification.expireAt) : '永不过期' }}
+          </span>
+          <p>{{ notification.content }}</p>
+        </div>
+        <div class="management-actions">
+          <button class="text-button danger-button" type="button" @click="revokeNotification(notification)">
+            撤回
+          </button>
+        </div>
+      </article>
+      <div v-if="notificationPage.totalPages > 1" class="pagination">
+        <button
+          class="text-button"
+          type="button"
+          :disabled="notificationPage.page <= 0"
+          @click="changeNotificationPage(notificationPage.page - 1)"
+        >
+          上一页
+        </button>
+        <span>第 {{ notificationPage.page + 1 }} / {{ notificationPage.totalPages }} 页</span>
+        <button
+          class="text-button"
+          type="button"
+          :disabled="notificationPage.page >= notificationPage.totalPages - 1"
+          @click="changeNotificationPage(notificationPage.page + 1)"
+        >
+          下一页
+        </button>
+      </div>
+    </div>
+
+    <div v-if="props.section === 'sensitive'" class="admin-section management-section">
+      <div class="management-heading">
+        <div>
+          <h2>敏感词词库</h2>
+          <p>CARE 级别只提示不阻断，HIGH 级别会直接阻断对话并给出心理援助热线。</p>
+        </div>
+        <span class="management-count">{{ sensitiveWords.length }} 个词条</span>
+      </div>
+      <form class="admin-form management-form" @submit.prevent="saveSensitiveWord">
+        <h3>{{ editingSensitiveWordId ? '编辑词条' : '新增词条' }}</h3>
+        <label>
+          <span>敏感词（最多 64 字）</span>
+          <input v-model="sensitiveWordForm.word" maxlength="64" />
+        </label>
+        <label>
+          <span>级别</span>
+          <select v-model="sensitiveWordForm.level">
+            <option value="CARE">CARE（提示但不阻断）</option>
+            <option value="HIGH">HIGH（直接阻断对话）</option>
+          </select>
+        </label>
+        <label class="admin-checkbox">
+          <input v-model="sensitiveWordForm.enabled" type="checkbox" />
+          <span>启用该词条</span>
+        </label>
+        <div class="management-actions">
+          <button class="primary-button" type="submit">
+            {{ editingSensitiveWordId ? '保存修改' : '新增词条' }}
+          </button>
+          <button
+            v-if="editingSensitiveWordId"
+            class="text-button"
+            type="button"
+            @click="cancelSensitiveWordEdit"
+          >
+            取消编辑
+          </button>
+        </div>
+      </form>
+      <div v-if="!sensitiveWords.length" class="empty-state">
+        词库为空时服务端会回退内置词表，校验仍然生效。
+      </div>
+      <article v-for="item in sensitiveWords" :key="item.id" class="management-item">
+        <div class="management-item-copy">
+          <strong>{{ item.word }}</strong>
+          <span>
+            {{ item.level === 'HIGH' ? 'HIGH 直接阻断' : 'CARE 提示不阻断' }} ·
+            {{ item.enabled ? '已启用' : '已停用' }}
+          </span>
+        </div>
+        <div class="management-actions">
+          <button class="text-button" type="button" @click="editSensitiveWord(item)">编辑</button>
+          <button class="text-button danger-button" type="button" @click="deleteSensitiveWord(item)">删除</button>
+        </div>
+      </article>
+    </div>
+
+    <div v-if="props.section === 'feedbacks'" class="admin-section management-section">
+      <div class="management-heading">
+        <div>
+          <h2>反馈工单</h2>
+          <p>查看用户提交的问题与建议，处理后标记状态并留下备注。</p>
+        </div>
+        <span class="management-count">{{ feedbackPage.total || 0 }} 条工单</span>
+      </div>
+      <div class="admin-filter-bar">
+        <label>
+          <span>状态筛选</span>
+          <select v-model="feedbackStatusFilter" @change="searchFeedbacks">
+            <option value="">全部</option>
+            <option value="PENDING">待处理</option>
+            <option value="PROCESSED">已处理</option>
+            <option value="REJECTED">已驳回</option>
+          </select>
+        </label>
+      </div>
+      <div v-if="!feedbacks.length" class="empty-state">暂无反馈工单。</div>
+      <article v-for="ticket in feedbacks" :key="ticket.id" class="management-item">
+        <div class="management-item-copy">
+          <strong>
+            {{ ticket.type === 'BUG' ? '问题反馈' : ticket.type === 'SUGGESTION' ? '功能建议' : '其他反馈' }}
+          </strong>
+          <span>
+            {{ formatDateTime(ticket.createdAt) }} ·
+            {{ ticket.status === 'PENDING' ? '待处理' : ticket.status === 'PROCESSED' ? '已处理' : '已驳回' }}
+          </span>
+          <p>{{ ticket.content }}</p>
+          <input v-model="ticket.remarkDraft" maxlength="500" placeholder="处理备注（最多 500 字）" />
+        </div>
+        <div class="management-actions">
+          <button class="secondary" type="button" @click="handleFeedback(ticket, 'PROCESSED')">标记已处理</button>
+          <button class="text-button" type="button" @click="handleFeedback(ticket, 'REJECTED')">驳回</button>
+        </div>
+      </article>
+      <div v-if="feedbackPage.totalPages > 1" class="pagination">
+        <button
+          class="text-button"
+          type="button"
+          :disabled="feedbackPage.page <= 0"
+          @click="changeFeedbackPage(feedbackPage.page - 1)"
+        >
+          上一页
+        </button>
+        <span>第 {{ feedbackPage.page + 1 }} / {{ feedbackPage.totalPages }} 页</span>
+        <button
+          class="text-button"
+          type="button"
+          :disabled="feedbackPage.page >= feedbackPage.totalPages - 1"
+          @click="changeFeedbackPage(feedbackPage.page + 1)"
+        >
+          下一页
+        </button>
+      </div>
+    </div>
+
+    <div v-if="props.section === 'logs'" class="admin-section management-section">
+      <div class="management-heading">
+        <div>
+          <h2>操作日志</h2>
+          <p>只记录操作者、类型、目标与摘要，不含业务正文，方便审计与追溯。</p>
+        </div>
+        <span class="management-count">{{ operationLogPage.total || 0 }} 条记录</span>
+      </div>
+      <div class="admin-filter-bar">
+        <label>
+          <span>操作类型</span>
+          <select v-model="operationLogTypeFilter" @change="searchOperationLogs">
+            <option value="">全部</option>
+            <option value="DOCUMENT">知识库文档</option>
+            <option value="SCALE">测评量表</option>
+            <option value="ARTICLE">科普文章</option>
+            <option value="ANNOUNCEMENT">系统公告</option>
+            <option value="USER">用户状态</option>
+            <option value="NOTIFICATION">通知推送</option>
+          </select>
+        </label>
+        <label>
+          <span>开始日期</span>
+          <input v-model="operationLogForm.startDate" type="date" />
+        </label>
+        <label>
+          <span>结束日期</span>
+          <input v-model="operationLogForm.endDate" type="date" />
+        </label>
+        <button class="secondary" type="button" @click="searchOperationLogs">查询</button>
+      </div>
+      <div v-if="!operationLogs.length" class="empty-state">暂无操作日志。</div>
+      <div v-else class="log-table">
+        <div class="log-row log-row-head">
+          <span>操作者</span>
+          <span>类型</span>
+          <span>目标</span>
+          <span>摘要</span>
+          <span>时间</span>
+        </div>
+        <div v-for="log in operationLogs" :key="log.id" class="log-row">
+          <span>{{ log.operatorName || '-' }}</span>
+          <span>{{ log.type }}</span>
+          <span>{{ log.targetId ? log.targetType + ' #' + log.targetId : log.targetType }}</span>
+          <span>{{ log.summary }}</span>
+          <time>{{ formatDateTime(log.createdAt) }}</time>
+        </div>
+      </div>
+      <div v-if="operationLogPage.totalPages > 1" class="pagination">
+        <button
+          class="text-button"
+          type="button"
+          :disabled="operationLogPage.page <= 0"
+          @click="changeOperationLogPage(operationLogPage.page - 1)"
+        >
+          上一页
+        </button>
+        <span>第 {{ operationLogPage.page + 1 }} / {{ operationLogPage.totalPages }} 页</span>
+        <button
+          class="text-button"
+          type="button"
+          :disabled="operationLogPage.page >= operationLogPage.totalPages - 1"
+          @click="changeOperationLogPage(operationLogPage.page + 1)"
+        >
+          下一页
+        </button>
+      </div>
     </div>
   </section>
   <div
@@ -768,4 +1549,26 @@ onBeforeUnmount(() => {
       </div>
     </section>
   </div>
+
+  <ConfirmDialog
+    :visible="Boolean(pendingConfirm)"
+    :title="pendingConfirm ? pendingConfirm.title : '操作确认'"
+    :message="pendingConfirm ? pendingConfirm.message : ''"
+    :confirm-text="pendingConfirm ? pendingConfirm.confirmText : '确认'"
+    :danger="true"
+    :busy="confirmBusy"
+    @confirm="runConfirmedAction"
+    @cancel="cancelConfirm"
+  />
 </template>
+/** 用户状态展示文案，已注销账号仍保留业务数据可查。 */
+function statusLabel(status) {
+  if (status === 'CLOSED') {
+    return '已注销';
+  }
+  if (status === 'DISABLED') {
+    return '已禁用';
+  }
+  return '正常';
+}
+ async function applyUserStatus(user, status) {

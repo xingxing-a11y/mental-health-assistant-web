@@ -59,12 +59,28 @@ function uploadAvatar(event) {
   <section class="content profile-page">
     <div v-if="profile" class="profile-card">
       <div class="profile-avatar-wrap">
-        <img v-if="profile.avatarUrl" class="avatar large profile-avatar-image" :src="avatarSource(profile.avatarUrl)" alt="用户头像" />
+        <img
+          v-if="profile.avatarUrl"
+          class="avatar large profile-avatar-image"
+          :src="avatarSource(profile.avatarUrl)"
+          alt="用户头像"
+        />
         <span v-else class="avatar large">{{ profile.nickname?.slice(0, 1) || 'U' }}</span>
-        <button class="secondary small" type="button" :disabled="props.avatarUploading" @click="chooseAvatar">
+        <button
+          class="secondary small"
+          type="button"
+          :disabled="props.avatarUploading"
+          @click="chooseAvatar"
+        >
           {{ props.avatarUploading ? '上传中...' : '更换头像' }}
         </button>
-        <input ref="avatarInput" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp" @change="uploadAvatar" />
+        <input
+          ref="avatarInput"
+          class="visually-hidden"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          @change="uploadAvatar"
+        />
       </div>
       <div class="profile-identity">
         <span class="eyebrow">YOUR PROFILE</span>
@@ -77,11 +93,18 @@ function uploadAvatar(event) {
     <div v-if="profile" class="profile-grid">
       <div class="profile-form">
         <div class="profile-form-heading">
-          <div><span class="eyebrow">PERSONAL DETAILS</span><h3>基本资料</h3></div>
+          <div>
+            <span class="eyebrow">PERSONAL DETAILS</span>
+            <h3>基本资料</h3>
+          </div>
           <span>完善信息后保存即可</span>
         </div>
-        <label>用户名 <input v-model.trim="profileForm.nickname" required /></label>
-        <label>性别
+        <label>
+          用户名
+          <input v-model.trim="profileForm.nickname" required />
+        </label>
+        <label>
+          性别
           <select v-model="profileForm.gender">
             <option value="">请选择</option>
             <option value="男">男</option>
@@ -89,17 +112,29 @@ function uploadAvatar(event) {
             <option value="不愿透露">不愿透露</option>
           </select>
         </label>
-        <label>年龄 <input v-model.number="profileForm.age" min="1" max="120" type="number" /></label>
+        <label>
+          年龄
+          <input v-model.number="profileForm.age" min="1" max="120" type="number" />
+        </label>
         <button class="primary-button" type="button" @click="saveProfile">保存资料</button>
       </div>
 
       <div class="profile-form">
         <div class="profile-form-heading">
-          <div><span class="eyebrow">SECURITY</span><h3>修改密码</h3></div>
+          <div>
+            <span class="eyebrow">SECURITY</span>
+            <h3>修改密码</h3>
+          </div>
           <span>定期更新密码更安全</span>
         </div>
-        <label>旧密码 <input v-model="passwordForm.oldPassword" type="password" /></label>
-        <label>新密码 <input v-model="passwordForm.newPassword" minlength="6" type="password" /></label>
+        <label>
+          旧密码
+          <input v-model="passwordForm.oldPassword" type="password" />
+        </label>
+        <label>
+          新密码
+          <input v-model="passwordForm.newPassword" minlength="6" type="password" />
+        </label>
         <button class="primary-button" type="button" @click="changePassword">更新密码</button>
       </div>
     </div>

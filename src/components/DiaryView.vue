@@ -219,7 +219,12 @@ function goPage(page) {
         <div class="diary-modal-pagination">
           <span>共 {{ allTotal }} 条 · 第 {{ allPage + 1 }} / {{ Math.max(allTotalPages, 1) }} 页</span>
           <div class="diary-modal-pagination-actions">
-            <button class="secondary small" type="button" :disabled="allPage === 0 || allLoading" @click="goPage(allPage - 1)">
+            <button
+              class="secondary small"
+              type="button"
+              :disabled="allPage === 0 || allLoading"
+              @click="goPage(allPage - 1)"
+            >
               上一页
             </button>
             <button
@@ -263,7 +268,9 @@ function goPage(page) {
         </template>
         <template v-else>
           <div class="diary-entry-meta">
-            <strong :class="`emotion-${selectedDiary.emotion.toLowerCase()}`">{{ displayEmotion(selectedDiary.emotion) }}</strong>
+            <strong :class="`emotion-${selectedDiary.emotion.toLowerCase()}`">
+              {{ displayEmotion(selectedDiary.emotion) }}
+            </strong>
             <time>{{ formatDateTime(selectedDiary.createdAt) }}</time>
           </div>
           <p class="diary-detail-content">{{ selectedDiary.content }}</p>

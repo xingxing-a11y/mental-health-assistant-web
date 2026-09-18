@@ -1,17 +1,33 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { Bell, Menu, Settings, UserRound, X } from 'lucide-vue-next';
 import AppSidebar from './components/AppSidebar.vue';
 import ArticleView from './components/ArticleView.vue';
 import AssessmentView from './components/AssessmentView.vue';
 import ChatView from './components/ChatView.vue';
+import ConfirmDialog from './components/ConfirmDialog.vue';
 import DisclaimerModal from './components/DisclaimerModal.vue';
+import ExtrasView from './components/ExtrasView.vue';
+import GentleReminder from './components/GentleReminder.vue';
 import ProfileView from './components/ProfileView.vue';
+import RelaxView from './components/RelaxView.vue';
 import SettingsView from './components/SettingsView.vue';
 import LoginView from './components/LoginView.vue';
 import AdminView from './components/AdminView.vue';
 import DiaryView from './components/DiaryView.vue';
-import { announcementApi, articleApi, assessmentApi, chatApi, diaryApi, streamChat, userApi } from './api/modules';
+import {
+  announcementApi,
+  articleApi,
+  assessmentApi,
+  chatApi,
+  diaryApi,
+  feedbackApi,
+  notificationApi,
+  settingsApi,
+  streamChat,
+  systemApi,
+  userApi,
+} from './api/modules';
 import { formatDateTime } from './utils/dateTime';
 
 const active = ref('chat');
@@ -57,14 +73,48 @@ const diaryAnalysisLoading = ref(false);
 const loading = ref(false);
 const error = ref('');
 const toast = ref('');
+const pendingConfirm = ref(null);
+const confirmBusy = ref(false);
 const authenticated = ref(true);
 const authChecking = ref(true);
 const ANNOUNCEMENT_VISIBLE_DAYS = 10;
-const ANNOUNCEMENT_POLL_INTERVAL = 30000;
+const BELL_POLL_INTERVAL = 60000;
+const NOTIFICATION_PAGE_SIZE = 10;
+
+const relaxSection = ref('breathe');
+const extrasSection = ref('compare');
+const userSettings = ref(null);
+const systemPolicy = ref(null);
+const pendingSensitive = ref(null);
+const exporting = ref(false);
+const riskTriggered = ref(false);
+const notifications = ref([]);
+const unreadNotificationCount = ref(0);
+const notificationTab = ref('announcement');
+const notificationLoading = ref(false);
+const notificationPage = ref(0);
+const notificationTotalPages = ref(0);
+const settingsSaving = ref(false);
+const settingsMessage = ref('');
+const settingsMessageError = ref(false);
+
+/** 流式输出的节流间隔（毫秒），FAST 为 0 表示直接显示。 */
+const STREAM_INTERVAL = {
+  SLOW: 120,
+  NORMAL: 50,
+  FAST: 0,
+};
 
 const unreadAnnouncementCount = computed(() => announcements.value
   .filter((announcement) => !announcementReadIds.value.has(String(announcement.id)))
   .length);
+
+const bellUnreadCount = computed(() => unreadAnnouncementCount.value + unreadNotificationCount.value);
+
+/** 危机干预提示：用户开关打开，或本次对话触发过高危提示时展示。 */
+const showCrisisTip = computed(() => riskTriggered.value || Boolean(userSettings.value?.crisisTip));
+
+const hotlines = computed(() => systemPolicy.value?.hotlines || []);
 
 function handleAuthExpired() {
   authenticated.value = false;
@@ -80,6 +130,8 @@ const titles = {
   assessment: '心理测评',
   articles: '心理科普',
   diary: '情绪日记',
+  relax: '放松小工具',
+  extras: '拓展功能',
   profile: '个人中心',
   settings: '设置',
   admin: '管理后台',
@@ -90,6 +142,40 @@ function notify(message, duration = 1800) {
   window.setTimeout(() => {
     toast.value = '';
   }, duration);
+}
+
+/** 打开二次确认弹窗，用户确认后再执行不可恢复的操作。 */
+function askConfirm(options) {
+  pendingConfirm.value = {
+    title: options.title,
+    message: options.message,
+    confirmText: options.confirmText || '确认',
+    action: options.action,
+  };
+}
+
+function cancelConfirm() {
+  if (confirmBusy.value) {
+    return;
+  }
+  pendingConfirm.value = null;
+}
+
+async function runConfirmedAction() {
+  if (!pendingConfirm.value || confirmBusy.value) {
+    return;
+  }
+
+  const { action } = pendingConfirm.value;
+  confirmBusy.value = true;
+  try {
+    await action();
+  } catch (requestError) {
+    error.value = requestError.message;
+  } finally {
+    confirmBusy.value = false;
+    pendingConfirm.value = null;
+  }
 }
 
 function isRecentAnnouncement(announcement) {
@@ -131,6 +217,22 @@ function selectModule(module) {
 function selectAdminSection(section) {
   active.value = 'admin';
   adminSection.value = section;
+  mobileOpen.value = false;
+  profileMenuOpen.value = false;
+  announcementModalOpen.value = false;
+}
+
+function selectRelaxSection(section) {
+  active.value = 'relax';
+  relaxSection.value = section;
+  mobileOpen.value = false;
+  profileMenuOpen.value = false;
+  announcementModalOpen.value = false;
+}
+
+function selectExtrasSection(section) {
+  active.value = 'extras';
+  extrasSection.value = section;
   mobileOpen.value = false;
   profileMenuOpen.value = false;
   announcementModalOpen.value = false;
@@ -178,6 +280,12 @@ function markAnnouncementRead(announcement) {
 function toggleAnnouncementModal() {
   announcementModalOpen.value = !announcementModalOpen.value;
   profileMenuOpen.value = false;
+
+  if (announcementModalOpen.value) {
+    notificationTab.value = 'announcement';
+    refreshAnnouncements();
+    refreshUnreadNotificationCount();
+  }
 }
 
 function closeAnnouncementModal() {
@@ -249,7 +357,20 @@ async function loadData() {
   error.value = '';
 
   try {
-    const [sessionData, scaleData, articleData, userData, historyData, diaryData, trendData, announcementData, favoriteData] = await Promise.all([
+    const [
+      sessionData,
+      scaleData,
+      articleData,
+      userData,
+      historyData,
+      diaryData,
+      trendData,
+      announcementData,
+      favoriteData,
+      settingsData,
+      policyData,
+      unreadData,
+    ] = await Promise.all([
       chatApi.list(),
       assessmentApi.scales(),
       articleApi.list(),
@@ -258,7 +379,10 @@ async function loadData() {
       diaryApi.list(),
       diaryApi.trend('', ''),
       announcementApi.list(),
-      chatApi.favorites(),
+      chatApi.favorites({ size: 50 }),
+      settingsApi.get(),
+      systemApi.policy(),
+      notificationApi.unreadCount(),
     ]);
 
     sessions.value = sessionData || [];
@@ -270,7 +394,10 @@ async function loadData() {
     emotionTrend.value = trendData || [];
     announcements.value = (announcementData || []).filter(isRecentAnnouncement);
     loadReadAnnouncementIds();
-    favorites.value = favoriteData || [];
+    favorites.value = favoriteData?.items || [];
+    userSettings.value = settingsData || null;
+    systemPolicy.value = policyData || null;
+    unreadNotificationCount.value = unreadData?.count ?? 0;
     disclaimerVisible.value = true;
   } catch (requestError) {
     error.value = requestError.message;
@@ -421,18 +548,18 @@ async function unarchiveSession(session) {
   }
 }
 
-async function deleteArchivedSession(session) {
-  if (!window.confirm('永久删除后将无法恢复，确定删除这个会话吗？')) {
-    return;
-  }
-
-  try {
-    await chatApi.remove(session.id);
-    archivedSessions.value = archivedSessions.value.filter((item) => item.id !== session.id);
-    notify('会话已永久删除');
-  } catch (requestError) {
-    error.value = requestError.message;
-  }
+/** 会话删除不可恢复，统一走 ConfirmDialog 二次确认。 */
+function deleteArchivedSession(session) {
+  askConfirm({
+    title: '删除会话',
+    message: `删除“${session.name || '未命名会话'}”后将无法恢复，确定继续吗？`,
+    confirmText: '永久删除',
+    action: async () => {
+      await chatApi.remove(session.id);
+      archivedSessions.value = archivedSessions.value.filter((item) => item.id !== session.id);
+      notify('会话已永久删除');
+    },
+  });
 }
 
 async function renameSession(session, name) {
@@ -467,17 +594,30 @@ async function updateChatMode(mode) {
 }
 
 async function toggleFavorite(message) {
-  const nextFavorite = !message.favorite;
-  await chatApi.favoriteMessage(message.id, nextFavorite);
-  const currentMessage = messages.value.find((item) => item.id === message.id);
-  if (currentMessage) {
-    currentMessage.favorite = nextFavorite;
+  try {
+    const nextFavorite = !message.favorite;
+    await chatApi.favoriteMessage(message.id, nextFavorite);
+    const currentMessage = messages.value.find((item) => item.id === message.id);
+    if (currentMessage) {
+      currentMessage.favorite = nextFavorite;
+    }
+    await loadFavorites();
+  } catch (requestError) {
+    error.value = requestError.message;
   }
-  favorites.value = await chatApi.favorites();
 }
 
+/** 收藏列表统一走分页信封，会话内展示时按当前会话过滤。 */
 async function loadFavorites() {
-  favorites.value = await chatApi.favorites();
+  try {
+    const sessionId = String(currentSessionId.value || '').startsWith('draft-')
+      ? undefined
+      : currentSessionId.value;
+    const result = await chatApi.favorites({ size: 50, sessionId });
+    favorites.value = result.items || [];
+  } catch (requestError) {
+    error.value = requestError.message;
+  }
 }
 
 async function searchArticles(keyword) {
@@ -488,7 +628,48 @@ async function searchArticles(keyword) {
   }
 }
 
-async function sendMessage(content) {
+/** 发送前预校验：命中敏感内容时先温和提示，用户确认后再真正发送。 */
+async function sendMessage(content, skipCheck = false) {
+  if (!content || !currentSessionId.value) {
+    return;
+  }
+
+  if (skipCheck) {
+    await deliverMessage(content);
+    return;
+  }
+
+  try {
+    const result = await chatApi.sensitiveCheck(content);
+    if (result?.triggered) {
+      pendingSensitive.value = {
+        content,
+        prompt: result.prompt,
+        level: result.level,
+        hotline: result.hotline,
+      };
+      return;
+    }
+  } catch {
+    // 预校验失败不阻断发送，服务端仍会执行强制校验。
+  }
+
+  await deliverMessage(content);
+}
+
+function cancelSensitiveSend() {
+  pendingSensitive.value = null;
+}
+
+async function continueSensitiveSend() {
+  const pending = pendingSensitive.value;
+  pendingSensitive.value = null;
+  if (pending) {
+    await sendMessage(pending.content, true);
+  }
+}
+
+async function deliverMessage(content) {
   if (!content || !currentSessionId.value) {
     return;
   }
@@ -514,6 +695,8 @@ async function sendMessage(content) {
     });
   }
 
+  const streamWriter = createStreamWriter(messages.value[assistantIndex]);
+
   try {
     await streamChat(currentSessionId.value, content, (eventName, data) => {
       if (eventName === 'ping') {
@@ -533,19 +716,23 @@ async function sendMessage(content) {
       if (eventName === 'message') {
         if (String(currentSessionId.value) === String(requestSessionId)
             && messages.value[assistantIndex]) {
-          messages.value[assistantIndex].content += payload.content || '';
+          streamWriter.push(payload.content || '');
         }
       }
 
       if (eventName === 'risk') {
+        streamWriter.finish();
         if (String(currentSessionId.value) === String(requestSessionId)
             && messages.value[assistantIndex]) {
-          messages.value[assistantIndex].content = payload.message || '';
+          const hotlineText = payload.hotline ? `\n心理援助热线：${payload.hotline}` : '';
+          messages.value[assistantIndex].content = `${payload.message || ''}${hotlineText}`;
         }
+        riskTriggered.value = true;
         notify('检测到危机风险，请优先联系专业援助');
       }
 
       if (eventName === 'error') {
+        streamWriter.finish();
         if (String(currentSessionId.value) === String(requestSessionId)
             && messages.value[assistantIndex]
             && !messages.value[assistantIndex].content) {
@@ -555,6 +742,7 @@ async function sendMessage(content) {
       }
     });
   } catch (requestError) {
+    streamWriter.finish();
     if (String(currentSessionId.value) === String(requestSessionId)
         && messages.value[assistantIndex]
         && !messages.value[assistantIndex].content) {
@@ -562,6 +750,8 @@ async function sendMessage(content) {
     }
     notify(requestError.message);
   } finally {
+    streamWriter.finish();
+    playMessageSound();
     const nextPending = new Set(pendingSessions.value);
     nextPending.delete(requestSessionId);
     pendingSessions.value = nextPending;
@@ -585,12 +775,20 @@ async function submitAssessment() {
       return { questionId: question.id, textAnswer: value };
     }
     if (question.type === 'MULTIPLE') {
-      return { questionId: question.id, optionIds: value, otherAnswer: report.value.otherAnswers?.[question.id] || null };
+      return {
+        questionId: question.id,
+        optionIds: value,
+        otherAnswer: report.value.otherAnswers?.[question.id] || null,
+      };
     }
     if (question.type === 'MATRIX') {
       return { questionId: question.id, matrixAnswers: value };
     }
-    return { questionId: question.id, optionId: Number(value), otherAnswer: report.value.otherAnswers?.[question.id] || null };
+    return {
+      questionId: question.id,
+      optionId: Number(value),
+      otherAnswer: report.value.otherAnswers?.[question.id] || null,
+    };
   });
 
   report.value = await assessmentApi.submit({
@@ -660,11 +858,225 @@ async function changePassword(data) {
   }
 }
 
+/** 主题与字号只作用在根元素上，取值来自后端保存的个人设置。 */
+function applyAppearance(settings) {
+  const root = document.documentElement;
+  root.classList.toggle('mh-theme-dark', settings?.theme === 'DARK');
+  root.classList.remove('mh-font-small', 'mh-font-medium', 'mh-font-large');
+  root.classList.add(`mh-font-${(settings?.fontScale || 'MEDIUM').toLowerCase()}`);
+}
+
+/** 消息提示音由 Web Audio 现场合成，不引入任何音频素材。 */
+function playMessageSound() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!userSettings.value?.messageSound || !AudioContextClass) {
+    return;
+  }
+
+  const context = new AudioContextClass();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.type = 'sine';
+  oscillator.frequency.value = 660;
+  gain.gain.setValueAtTime(0.06, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.24);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.24);
+  oscillator.addEventListener('ended', () => context.close());
+}
+
+/**
+ * 按“流式输出打字速度”把 SSE 片段逐步写入气泡。
+ * FAST 直接写入；其它档位先缓存，再按固定间隔成块刷出。
+ */
+function createStreamWriter(message) {
+  const interval = STREAM_INTERVAL[userSettings.value?.streamSpeed];
+  if (!interval) {
+    return {
+      push: (chunk) => {
+        message.content += chunk;
+      },
+      finish: () => {},
+    };
+  }
+
+  let buffer = '';
+  const timerId = window.setInterval(() => {
+    if (!buffer) {
+      return;
+    }
+    message.content += buffer.slice(0, 6);
+    buffer = buffer.slice(6);
+  }, interval);
+
+  return {
+    push: (chunk) => {
+      buffer += chunk;
+    },
+    finish: () => {
+      window.clearInterval(timerId);
+      message.content += buffer;
+      buffer = '';
+    },
+  };
+}
+
+async function refreshUnreadNotificationCount() {
+  if (!authenticated.value || !profile.value) {
+    return;
+  }
+
+  try {
+    const result = await notificationApi.unreadCount();
+    unreadNotificationCount.value = result?.count ?? 0;
+  } catch {
+    // 低频轮询失败不打断当前页面，下一次轮询会继续尝试。
+  }
+}
+
+async function loadNotifications(page = 0) {
+  notificationLoading.value = true;
+  try {
+    const result = await notificationApi.list(page, NOTIFICATION_PAGE_SIZE);
+    notifications.value = result.items || [];
+    notificationPage.value = result.page || 0;
+    notificationTotalPages.value = result.totalPages || 0;
+  } catch (requestError) {
+    error.value = requestError.message;
+  } finally {
+    notificationLoading.value = false;
+  }
+}
+
+/** 铃铛是公告与个人通知的统一入口，展开时才拉取对应列表。 */
+function switchNotificationTab(tab) {
+  notificationTab.value = tab;
+  if (tab === 'notification') {
+    loadNotifications(0);
+    return;
+  }
+  refreshAnnouncements();
+}
+
+async function markNotificationRead(notification) {
+  if (notification.read) {
+    return;
+  }
+
+  try {
+    await notificationApi.markRead(notification.id);
+    notification.read = true;
+    await refreshUnreadNotificationCount();
+  } catch (requestError) {
+    error.value = requestError.message;
+  }
+}
+
+async function markAllNotificationsRead() {
+  try {
+    await notificationApi.markAllRead();
+    notifications.value = notifications.value.map((item) => ({ ...item, read: true }));
+    unreadNotificationCount.value = 0;
+  } catch (requestError) {
+    error.value = requestError.message;
+  }
+}
+
+function changeNotificationPage(page) {
+  if (page < 0 || (notificationTotalPages.value && page >= notificationTotalPages.value)) {
+    return;
+  }
+  loadNotifications(page);
+}
+
+async function exportSession(session, format) {
+  if (exporting.value) {
+    return;
+  }
+
+  exporting.value = true;
+  error.value = '';
+  try {
+    const filename = await chatApi.exportSession(session.id, format);
+    notify(`已导出 ${filename}`, 2600);
+  } catch (requestError) {
+    notify(requestError.message, 3000);
+  } finally {
+    exporting.value = false;
+  }
+}
+
+async function saveSettings(data) {
+  if (settingsSaving.value) {
+    return;
+  }
+
+  settingsSaving.value = true;
+  settingsMessage.value = '';
+  settingsMessageError.value = false;
+  try {
+    userSettings.value = await settingsApi.update(data);
+    settingsMessage.value = '设置已保存';
+    notify('设置已保存');
+  } catch (requestError) {
+    settingsMessage.value = requestError.message || '保存失败，请稍后重试';
+    settingsMessageError.value = true;
+    error.value = requestError.message;
+  } finally {
+    settingsSaving.value = false;
+    window.setTimeout(() => {
+      settingsMessage.value = '';
+      settingsMessageError.value = false;
+    }, 3000);
+  }
+}
+
+async function submitFeedback(data) {
+  try {
+    await feedbackApi.submit(data);
+    notify('反馈已提交，感谢你的建议');
+  } catch (requestError) {
+    error.value = requestError.message;
+  }
+}
+
+/** 注销只做匿名化，业务数据保留，因此必须二次确认。 */
+function deactivateAccount() {
+  askConfirm({
+    title: '注销账号',
+    message: '注销后账号不可恢复，昵称、头像与手机号会被清除；聊天、日记与测评数据将匿名化保留。确定继续吗？',
+    confirmText: '确认注销',
+    action: async () => {
+      await settingsApi.deactivate();
+      notify('账号已注销', 2600);
+      window.setTimeout(() => window.location.reload(), 900);
+    },
+  });
+}
+
+async function startScaleFromExtras(scaleId) {
+  try {
+    await startAssessment({ id: scaleId });
+    active.value = 'assessment';
+  } catch (requestError) {
+    error.value = requestError.message;
+  }
+}
+
+function refreshBellCounters() {
+  refreshAnnouncements();
+  refreshUnreadNotificationCount();
+}
+
+watch(userSettings, (settings) => applyAppearance(settings));
+
 onMounted(() => {
   window.addEventListener('mh-auth-expired', handleAuthExpired);
   document.addEventListener('click', closeProfileMenu);
   window.addEventListener('keydown', handleAnnouncementKeydown);
-  announcementPollingId = window.setInterval(refreshAnnouncements, ANNOUNCEMENT_POLL_INTERVAL);
+  announcementPollingId = window.setInterval(refreshBellCounters, BELL_POLL_INTERVAL);
   loadData();
 });
 
@@ -685,15 +1097,19 @@ onBeforeUnmount(() => {
     <AppSidebar
       :active="active"
       :admin-section="adminSection"
+      :relax-section="relaxSection"
+      :extras-section="extrasSection"
       :open="mobileOpen"
       :is-admin="profile?.role === 'ADMIN'"
       @select="selectModule"
       @select-admin="selectAdminSection"
+      @select-relax="selectRelaxSection"
+      @select-extras="selectExtrasSection"
       @close="mobileOpen = false"
       @logout="logout"
     />
 
-    <main>
+    <main :class="{ 'settings-layout': active === 'settings' }">
       <header>
         <button class="icon mobile-menu" @click="mobileOpen = true">
           <Menu :size="21" />
@@ -707,14 +1123,14 @@ onBeforeUnmount(() => {
             <button
               class="notification-trigger"
               type="button"
-              aria-label="查看系统公告"
+              aria-label="查看消息中心"
               :aria-expanded="announcementModalOpen"
               aria-haspopup="dialog"
               @click="toggleAnnouncementModal"
             >
               <Bell :size="19" />
-              <span v-if="unreadAnnouncementCount" class="notification-badge">
-                {{ unreadAnnouncementCount > 99 ? '99+' : unreadAnnouncementCount }}
+              <span v-if="bellUnreadCount" class="notification-badge">
+                {{ bellUnreadCount > 99 ? '99+' : bellUnreadCount }}
               </span>
             </button>
           </div>
@@ -726,7 +1142,12 @@ onBeforeUnmount(() => {
               aria-haspopup="menu"
               @click="toggleProfileMenu"
             >
-              <img v-if="profile.avatarUrl" class="avatar profile-avatar-image" :src="`/api/v1${profile.avatarUrl}`" alt="用户头像" />
+              <img
+                v-if="profile.avatarUrl"
+                class="avatar profile-avatar-image"
+                :src="`/api/v1${profile.avatarUrl}`"
+                alt="用户头像"
+              />
               <span v-else class="avatar">{{ profile.nickname?.slice(0, 1) || 'U' }}</span>
               <span>{{ profile.nickname }}</span>
               <UserRound :size="16" />
@@ -754,6 +1175,8 @@ onBeforeUnmount(() => {
         :current-session-id="currentSessionId"
         :mode="chatMode"
         :disclaimer-visible="disclaimerVisible"
+        :crisis-tip="showCrisisTip"
+        :hotlines="hotlines"
         @create="createSession"
         @open="openSession"
         @archive="archiveSession"
@@ -764,6 +1187,7 @@ onBeforeUnmount(() => {
         @mode="updateChatMode"
         @favorite="toggleFavorite"
         @load-favorites="loadFavorites"
+        @export="exportSession"
       />
       <AssessmentView
         v-else-if="active === 'assessment'"
@@ -805,6 +1229,16 @@ onBeforeUnmount(() => {
         @close-all="closeAllDiaries"
         @all-page="changeAllDiariesPage"
       />
+      <RelaxView
+        v-else-if="active === 'relax'"
+        :section="relaxSection"
+      />
+      <ExtrasView
+        v-else-if="active === 'extras'"
+        :section="extrasSection"
+        @start-scale="startScaleFromExtras"
+        @notify="notify"
+      />
       <AdminView
         v-else-if="active === 'admin' && profile?.role === 'ADMIN'"
         :section="adminSection"
@@ -815,10 +1249,18 @@ onBeforeUnmount(() => {
         :archived-sessions="archivedSessions"
         :archived-visible="archivedSessionsVisible"
         :loading="archivedSessionsLoading"
+        :settings="userSettings"
+        :policy="systemPolicy"
+        :saving="settingsSaving"
+        :message="settingsMessage"
+        :message-error="settingsMessageError"
         @open-archived="openArchivedSessions"
         @back="archivedSessionsVisible = false"
         @unarchive="unarchiveSession"
         @delete="deleteArchivedSession"
+        @save-settings="saveSettings"
+        @submit-feedback="submitFeedback"
+        @deactivate="deactivateAccount"
       />
       <ProfileView
         v-else
@@ -848,47 +1290,117 @@ onBeforeUnmount(() => {
       >
         <div class="announcement-modal-head">
           <div>
-            <span class="eyebrow">LATEST UPDATES</span>
-            <h2 id="announcement-modal-title">系统公告</h2>
+            <span class="eyebrow">MESSAGE CENTER</span>
+            <h2 id="announcement-modal-title">消息中心</h2>
           </div>
           <button
             class="icon"
             type="button"
-            aria-label="关闭系统公告"
+            aria-label="关闭消息中心"
             title="关闭"
             @click="closeAnnouncementModal"
           >
             <X :size="19" />
           </button>
         </div>
-        <div v-if="!announcements.length" class="announcement-empty">
-          暂无系统公告
-        </div>
-        <div v-else class="announcement-modal-list">
-          <article
-            v-for="announcement in announcements"
-            :key="announcement.id"
-            class="announcement-card"
-            role="button"
-            tabindex="0"
-            @click="openAnnouncementDetail(announcement)"
-            @keydown="handleAnnouncementCardKeydown($event, announcement)"
+        <div class="notification-tabs">
+          <button
+            type="button"
+            :class="{ active: notificationTab === 'announcement' }"
+            @click="switchNotificationTab('announcement')"
           >
-            <div class="announcement-card-marker" aria-hidden="true" />
-            <div class="announcement-card-body">
-              <div class="announcement-card-meta">
-                <span>系统通知</span>
-                <time>{{ formatDateTime(announcement.createdAt) }}</time>
+            系统公告
+          </button>
+          <button
+            type="button"
+            :class="{ active: notificationTab === 'notification' }"
+            @click="switchNotificationTab('notification')"
+          >
+            我的通知
+          </button>
+        </div>
+        <template v-if="notificationTab === 'announcement'">
+          <div v-if="!announcements.length" class="announcement-empty">
+            暂无系统公告
+          </div>
+          <div v-else class="announcement-modal-list">
+            <article
+              v-for="announcement in announcements"
+              :key="announcement.id"
+              class="announcement-card"
+              role="button"
+              tabindex="0"
+              @click="openAnnouncementDetail(announcement)"
+              @keydown="handleAnnouncementCardKeydown($event, announcement)"
+            >
+              <div class="announcement-card-marker" aria-hidden="true" />
+              <div class="announcement-card-body">
+                <div class="announcement-card-meta">
+                  <span>系统通知</span>
+                  <time>{{ formatDateTime(announcement.createdAt) }}</time>
+                </div>
+                <h3>{{ announcement.title }}</h3>
+                <p class="announcement-card-preview">{{ announcement.content }}</p>
               </div>
-              <h3>{{ announcement.title }}</h3>
-              <p class="announcement-card-preview">{{ announcement.content }}</p>
-            </div>
-          </article>
+            </article>
+          </div>
+        </template>
+        <div v-else class="notification-list-wrap">
+          <p v-if="notificationLoading" class="loading-state">正在加载通知...</p>
+          <div v-else-if="!notifications.length" class="announcement-empty">
+            暂无个人通知
+          </div>
+          <div v-else class="notification-list">
+            <article
+              v-for="notification in notifications"
+              :key="notification.id"
+              class="notification-card"
+              :class="{ unread: !notification.read }"
+              @click="markNotificationRead(notification)"
+            >
+              <div class="notification-card-head">
+                <strong>{{ notification.title }}</strong>
+                <time>{{ formatDateTime(notification.createdAt) }}</time>
+              </div>
+              <p>{{ notification.content }}</p>
+            </article>
+          </div>
+          <div v-if="notificationTotalPages > 1" class="pagination">
+            <button
+              class="text-button"
+              type="button"
+              :disabled="notificationPage <= 0"
+              @click="changeNotificationPage(notificationPage - 1)"
+            >
+              上一页
+            </button>
+            <span>第 {{ notificationPage + 1 }} / {{ notificationTotalPages }} 页</span>
+            <button
+              class="text-button"
+              type="button"
+              :disabled="notificationPage >= notificationTotalPages - 1"
+              @click="changeNotificationPage(notificationPage + 1)"
+            >
+              下一页
+            </button>
+          </div>
         </div>
         <div class="announcement-modal-foot">
-          <span>仅显示最近 10 天的公告</span>
+          <span>
+            {{ notificationTab === 'announcement' ? '仅显示最近 10 天的公告' : '通知由管理后台推送，过期后自动隐藏' }}
+          </span>
           <div class="announcement-modal-foot-actions">
-            <button class="secondary" type="button" @click="markAnnouncementsRead">全部标为已读</button>
+            <button
+              v-if="notificationTab === 'announcement'"
+              class="secondary"
+              type="button"
+              @click="markAnnouncementsRead"
+            >
+              全部标为已读
+            </button>
+            <button v-else class="secondary" type="button" @click="markAllNotificationsRead">
+              全部标为已读
+            </button>
             <button class="primary-button" type="button" @click="closeAnnouncementModal">知道了</button>
           </div>
         </div>
@@ -968,6 +1480,24 @@ onBeforeUnmount(() => {
         </div>
       </section>
     </div>
+    <GentleReminder
+      :visible="Boolean(pendingSensitive)"
+      :prompt="pendingSensitive ? pendingSensitive.prompt : ''"
+      :level="pendingSensitive ? pendingSensitive.level : 'CARE'"
+      :hotline="pendingSensitive ? pendingSensitive.hotline : ''"
+      @continue="continueSensitiveSend"
+      @cancel="cancelSensitiveSend"
+    />
+    <ConfirmDialog
+      :visible="Boolean(pendingConfirm)"
+      :title="pendingConfirm ? pendingConfirm.title : '操作确认'"
+      :message="pendingConfirm ? pendingConfirm.message : ''"
+      :confirm-text="pendingConfirm ? pendingConfirm.confirmText : '确认'"
+      :danger="true"
+      :busy="confirmBusy"
+      @confirm="runConfirmedAction"
+      @cancel="cancelConfirm"
+    />
     <div v-if="toast" class="toast">{{ toast }}</div>
   </div>
   <div v-else class="loading-state">正在验证登录状态...</div>

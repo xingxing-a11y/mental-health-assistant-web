@@ -1,4 +1,19 @@
-import { get, post, put, remove, request } from './client';
+import { get, post, put, remove, request, downloadFile } from './client';
+
+/** 把可选参数拼成查询串，空值不参与拼接。 */
+export function buildQuery(params = {}) {
+  const search = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+    search.set(key, value);
+  });
+
+  const query = search.toString();
+  return query ? `?${query}` : '';
+}
 
 export const userApi = {
   current: () => get('/users/me'),
@@ -27,7 +42,12 @@ export const chatApi = {
   unarchive: (id) => put(`/chat/sessions/${id}/unarchive`),
   updateSettings: (id, mode) => put(`/chat/sessions/${id}/settings`, { mode }),
   favoriteMessage: (id, favorite) => put(`/chat/messages/${id}/favorite`, { favorite }),
-  favorites: () => get('/chat/messages/favorites'),
+  favorites: (params = {}) => get(`/chat/messages/favorites${buildQuery(params)}`),
+  removeFavorite: (messageId) => remove(`/chat/messages/favorites/${messageId}`),
+  sensitiveCheck: (content) => post('/chat/sensitive-check', { content }),
+  exportSession: (sessionId, format) => downloadFile(
+    `/chat/sessions/${sessionId}/export${buildQuery({ format })}`,
+  ),
 };
 
 export const assessmentApi = {
@@ -36,10 +56,14 @@ export const assessmentApi = {
   submit: (data) => post('/assessments', data),
   analyze: (resultId) => post('/assessments/analysis', { resultId }),
   history: () => get('/assessments'),
+  favorites: () => get('/assessments/favorites'),
+  updateFavorite: (scaleId, favorite) => put(`/assessments/scales/${scaleId}/favorite`, { favorite }),
+  scaleHistory: (scaleId) => get(`/assessments/scales/${scaleId}/history`),
+  recommendations: () => get('/assessments/recommendations'),
 };
 
 export const articleApi = {
-  list: (keyword = '') => get(`/articles${keyword ? `?keyword=${encodeURIComponent(keyword)}` : ''}`),
+  list: (keyword = '') => get(`/articles${buildQuery({ keyword })}`),
   detail: (id) => get(`/articles/${id}`),
 };
 
@@ -65,6 +89,37 @@ export const diaryApi = {
   },
 };
 
+export const relaxApi = {
+  overview: () => get('/relax/overview'),
+  meditations: () => get('/relax/meditations'),
+  records: (page = 0, size = 20, type = '') => get(`/relax/records${buildQuery({ page, size, type })}`),
+  createRecord: (data) => post('/relax/records', data),
+  stressLogs: (page = 0, size = 20) => get(`/relax/stress-logs${buildQuery({ page, size })}`),
+  createStressLog: (data) => post('/relax/stress-logs', data),
+  stressTrend: (days = 30) => get(`/relax/stress-trend${buildQuery({ days })}`),
+};
+
+export const notificationApi = {
+  list: (page = 0, size = 20) => get(`/notifications${buildQuery({ page, size })}`),
+  unreadCount: () => get('/notifications/unread-count'),
+  markRead: (id) => put(`/notifications/${id}/read`),
+  markAllRead: () => put('/notifications/read-all'),
+};
+
+export const settingsApi = {
+  get: () => get('/users/me/settings'),
+  update: (data) => put('/users/me/settings', data),
+  deactivate: () => post('/users/me/deactivate'),
+};
+
+export const systemApi = {
+  policy: () => get('/system/policy'),
+};
+
+export const feedbackApi = {
+  submit: (data) => post('/feedbacks', data),
+};
+
 export const adminApi = {
   users: (page = 0, size = 20, nickname = '') => {
     const params = new URLSearchParams({ page, size });
@@ -83,6 +138,7 @@ export const adminApi = {
   scales: () => get('/admin/scales'),
   createScale: (data) => post('/admin/scales', data),
   updateScale: (id, data) => put(`/admin/scales/${id}`, data),
+  publishScale: (id) => put(`/admin/scales/${id}/publish`),
   deleteScale: (id) => remove(`/admin/scales/${id}`),
   updateQuestions: (id, data) => put(`/admin/scales/${id}/questions`, data),
   articles: () => get('/admin/articles'),
@@ -95,6 +151,18 @@ export const adminApi = {
   createAnnouncement: (data) => post('/admin/announcements', data),
   updateAnnouncement: (id, data) => put(`/admin/announcements/${id}`, data),
   deleteAnnouncement: (id) => remove(`/admin/announcements/${id}`),
+  notifications: (page = 0, size = 20) => get(`/admin/notifications${buildQuery({ page, size })}`),
+  pushNotification: (data) => post('/admin/notifications', data),
+  revokeNotification: (id) => remove(`/admin/notifications/${id}`),
+  sensitiveWords: () => get('/admin/sensitive-words'),
+  createSensitiveWord: (data) => post('/admin/sensitive-words', data),
+  updateSensitiveWord: (id, data) => put(`/admin/sensitive-words/${id}`, data),
+  deleteSensitiveWord: (id) => remove(`/admin/sensitive-words/${id}`),
+  feedbacks: (page = 0, size = 20, status = '') => get(`/admin/feedbacks${buildQuery({ page, size, status })}`),
+  handleFeedback: (id, data) => put(`/admin/feedbacks/${id}`, data),
+  operationLogs: (params = {}) => get(`/admin/operation-logs${buildQuery(params)}`),
+  knowledgeSettings: () => get('/admin/knowledge-settings'),
+  updateKnowledgeSettings: (data) => put('/admin/knowledge-settings', data),
 };
 
 export const announcementApi = {

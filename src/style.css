@@ -15,16 +15,16 @@ button { cursor: pointer; border: 0; }
 .mobile-close, .mobile-menu { display: none; }
 nav { display: grid; gap: 6px; }
 nav button { display: flex; align-items: center; gap: 12px; color: #aac7bc; background: transparent; text-align: left; padding: 12px; border-radius: 8px; }
-.sidebar nav > button.active:not(.admin-nav-toggle) { background: #285858; color: #fff; }
+.sidebar nav > button.active:not(.sidebar-nav-toggle) { background: #285858; color: #fff; }
 nav button:hover { background: #285858; color: white; }
-.admin-nav-toggle { width: 100%; }
-.admin-nav-toggle.active { background: #285858; color: #fff; }
-.admin-nav-toggle span:nth-child(2) { flex: 1; }
-.admin-nav-caret { margin-left: auto; transition: transform .18s ease; }
-.admin-nav-caret.expanded { transform: rotate(180deg); }
-.admin-subnav { display: grid; gap: 3px; margin: -2px 0 4px 18px; padding-left: 12px; border-left: 1px solid #31605c; }
-.admin-subnav button { padding: 9px 10px; font-size: 13px; gap: 9px; }
-.admin-subnav button.active { background: #dba95d; color: #173a3a; }
+.sidebar-nav-toggle { width: 100%; }
+.sidebar-nav-toggle.active { background: #285858; color: #fff; }
+.sidebar-nav-toggle span:nth-child(2) { flex: 1; }
+.sidebar-nav-caret { margin-left: auto; transition: transform .18s ease; }
+.sidebar-nav-caret.expanded { transform: rotate(180deg); }
+.sidebar-subnav { display: grid; gap: 3px; margin: -2px 0 4px 18px; padding-left: 12px; border-left: 1px solid #31605c; }
+.sidebar-subnav button { padding: 9px 10px; font-size: 13px; gap: 9px; }
+.sidebar-subnav button.active { background: #dba95d; color: #173a3a; }
 .side-note { margin-top: auto; border-top: 1px solid #31605c; padding: 18px 8px 0; display: flex; gap: 9px; color: #a9c7bc; font-size: 12px; }
 .logout { background: transparent; color: #aac7bc; display: flex; gap: 10px; padding: 10px 8px; text-align: left; }
 main { flex: 1; min-width: 0; height: 100vh; overflow-y: auto; }
@@ -73,10 +73,46 @@ h1 { font-size: 30px; margin-top: 4px; }
 .settings-placeholder { display: grid; justify-items: start; align-content: start; gap: 12px; color: #668078; }
 .settings-placeholder svg { color: #2f6b58; }
 .settings-placeholder h2 { color: #172326; font-size: 26px; }
-.settings-page { display: grid; gap: 28px; }
-.settings-heading { margin-bottom: 0; }
-.settings-heading h2 { margin-top: 6px; }
-.settings-heading p { margin-top: 8px; color: #668078; font-size: 14px; }
+main.settings-layout {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+main.settings-layout > header {
+  flex: 0 0 auto;
+}
+
+.settings-page {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 22px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* 顶部设置页签与保存按钮固定，只有下方的设置内容区域滚动 */
+.settings-fixed {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e3ebe6;
+}
+
+.settings-scroll {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 22px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 6px;
+}
 .settings-list { display: grid; gap: 12px; max-width: 760px; }
 .settings-option { display: flex; align-items: center; gap: 14px; width: 100%; padding: 18px; border: 1px solid #dfe9e3; border-radius: 8px; background: #fff; color: #285858; text-align: left; transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
 .settings-option:hover { border-color: #b9d0c3; box-shadow: 0 8px 20px #173a3a12; transform: translateY(-1px); }
@@ -201,6 +237,13 @@ h1 { font-size: 30px; margin-top: 4px; }
 .modal-backdrop { position: fixed; inset: 0; background: #102c2c80; display: grid; place-items: center; padding: 20px; }
 .modal { background: #fff; padding: 32px; max-width: 430px; border-radius: 10px; }
 .modal p { color: #607b72; font-size: 14px; margin: 12px 0 22px; }
+.confirm-modal { display: grid; gap: 6px; max-width: 460px; }
+.confirm-modal h2 { color: #285858; font-size: 24px; }
+.confirm-modal p { color: #607b72; font-size: 14px; }
+.confirm-modal-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 22px; }
+.confirm-modal-danger { background: #a95d58; }
+.confirm-modal-danger:hover { background: #93463f; }
+.text-button:disabled { opacity: 0.55; cursor: not-allowed; }
 .expandable-editor { resize: none; }
 .editor-modal-backdrop { position: fixed; z-index: 30; inset: 0; display: grid; place-items: center; padding: 24px; background: #102c2c80; }
 .editor-modal { width: min(900px, 100%); max-height: min(760px, calc(100vh - 48px)); display: grid; gap: 16px; padding: 24px; border: 1px solid #dfe8e2; border-radius: 10px; background: #fff; box-shadow: 0 18px 50px #173a3a33; }
@@ -479,4 +522,950 @@ h1 { font-size: 30px; margin-top: 4px; }
   .notice { display: inline-block; margin-top: 16px; }
   .intro-copy { display: grid; gap: 4px; }
   .intro-copy p { white-space: normal; }
+}
+
+/* ===== 三期：放松小工具 / 拓展功能 / 消息中心 / 设置分区 ===== */
+
+.relax-page,
+.extras-page {
+  display: grid;
+  gap: 22px;
+}
+
+.relax-heading p,
+.extras-heading p {
+  margin-top: 8px;
+  color: #668078;
+  font-size: 14px;
+}
+
+.relax-panel,
+.extras-panel {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid #dfe9e3;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.relax-panel-head,
+.extras-panel-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  color: #285858;
+}
+
+.relax-panel-head h3,
+.extras-panel-head h3 {
+  font-size: 18px;
+}
+
+.relax-panel-head p,
+.extras-panel-head p {
+  margin-top: 6px;
+  color: #668078;
+  font-size: 14px;
+}
+
+.breath-stage {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+}
+
+.breath-circle {
+  width: 190px;
+  height: 190px;
+  border-radius: 50%;
+  border: 3px solid #d4e1d9;
+  background: #e5f0e9;
+  color: #285858;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 6px;
+  transition: transform 1s ease, background 1s ease, border-color 1s ease;
+}
+
+.breath-circle strong {
+  font-family: Fraunces, serif;
+  font-size: 24px;
+}
+
+.breath-circle span {
+  font-size: 14px;
+  color: #59766c;
+}
+
+.breath-circle.active {
+  transform: scale(1.12);
+  background: #d4e1d9;
+  border-color: #285858;
+}
+
+.breath-circle.active.phase-exhale {
+  transform: scale(0.92);
+}
+
+.breath-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  color: #59766c;
+  font-size: 13px;
+}
+
+.relax-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+
+.relax-history {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #dfe9e3;
+  padding-top: 16px;
+}
+
+.relax-history h4,
+.extras-subheading {
+  color: #285858;
+  font-size: 15px;
+}
+
+.relax-history ul,
+.favorite-toggle-list,
+.comparison-list,
+.recommendation-list,
+.favorite-message-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.relax-history li,
+.favorite-toggle-list li,
+.comparison-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid #e0e9e3;
+  border-radius: 6px;
+  background: #fbfdfb;
+  color: #59766c;
+  font-size: 13px;
+}
+
+.relax-history li time,
+.comparison-list li time {
+  margin-left: auto;
+  color: #779087;
+}
+
+.favorite-toggle-list li span {
+  flex: 1;
+  color: #285858;
+}
+
+.meditation-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.meditation-card {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #e0e9e3;
+  border-radius: 8px;
+  background: #fbfdfb;
+}
+
+.meditation-card.playing {
+  border-color: #285858;
+  background: #e5f0e9;
+}
+
+.meditation-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  color: #285858;
+}
+
+.meditation-card-head span {
+  font-size: 12px;
+  color: #779087;
+}
+
+.meditation-card p {
+  color: #59766c;
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.meditation-player {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border-left: 3px solid #dba95d;
+  border-radius: 6px;
+  background: #fff4dc;
+  color: #956b2d;
+}
+
+.meditation-player h4 {
+  color: #956b2d;
+  font-size: 16px;
+}
+
+.meditation-player p {
+  color: #956b2d;
+  line-height: 1.7;
+}
+
+.meditation-player small {
+  color: #956b2d;
+  font-size: 12px;
+}
+
+.stress-form {
+  display: grid;
+  gap: 16px;
+  max-width: 560px;
+}
+
+.stress-level-field,
+.stress-note-field {
+  display: grid;
+  gap: 8px;
+  color: #285858;
+  font-size: 14px;
+}
+
+.stress-level-field input[type='range'] {
+  width: 100%;
+  accent-color: #285858;
+}
+
+.stress-level-scale {
+  display: flex;
+  justify-content: space-between;
+  color: #779087;
+  font-size: 12px;
+}
+
+.stress-note-field textarea {
+  padding: 10px;
+  border: 1px solid #d4e1d9;
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.stress-trend-chart,
+.extras-chart {
+  width: 100%;
+  height: 260px;
+}
+
+.extras-select,
+.extras-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #285858;
+  font-size: 14px;
+}
+
+.extras-select select,
+.extras-search input {
+  padding: 9px 10px;
+  border: 1px solid #d4e1d9;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.extras-search {
+  padding: 12px 14px;
+  border: 1px solid #e0e9e3;
+  border-radius: 8px;
+  background: #fbfdfb;
+}
+
+.extras-search input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  outline: 0;
+}
+
+.recommendation-list li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid #e0e9e3;
+  border-radius: 8px;
+  background: #fbfdfb;
+}
+
+.recommendation-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.recommendation-copy strong {
+  color: #285858;
+  font-size: 16px;
+}
+
+.recommendation-copy p {
+  color: #59766c;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.recommendation-copy small {
+  color: #779087;
+  font-size: 12px;
+}
+
+.favorite-message-list li {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #e0e9e3;
+  border-radius: 8px;
+  background: #fbfdfb;
+}
+
+.favorite-message-list li p {
+  color: #285858;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.favorite-message-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #779087;
+  font-size: 12px;
+}
+
+/* ===== 三期：消息中心 ===== */
+
+.notification-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 0 4px;
+}
+
+.notification-tabs button {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #b4c9bd;
+  background: transparent;
+  color: #285858;
+  font-size: 13px;
+}
+
+.notification-tabs button.active {
+  background: #285858;
+  border-color: #285858;
+  color: #fff;
+}
+
+.notification-list-wrap {
+  display: grid;
+  gap: 10px;
+}
+
+.notification-list {
+  display: grid;
+  gap: 10px;
+}
+
+.notification-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid #dfe9e3;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.notification-card:hover {
+  border-color: #b9d0c3;
+}
+
+.notification-card.unread {
+  border-left: 3px solid #dba95d;
+  background: #fffaf0;
+}
+
+.notification-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notification-card-head strong {
+  color: #285858;
+  font-size: 15px;
+}
+
+.notification-card-head time {
+  color: #779087;
+  font-size: 12px;
+}
+
+.notification-card p {
+  color: #59766c;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* ===== 三期：对话页危机提示与温和提醒 ===== */
+
+.crisis-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  border: 1px solid #e9d7b6;
+  border-left: 3px solid #dba95d;
+  border-radius: 7px;
+  background: #fffaf0;
+  color: #956b2d;
+}
+
+.crisis-banner strong {
+  font-size: 14px;
+}
+
+.crisis-banner p {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.gentle-reminder-modal {
+  display: grid;
+  gap: 10px;
+  max-width: 460px;
+}
+
+.gentle-reminder-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: #fff4dc;
+  color: #956b2d;
+}
+
+.gentle-reminder-hotline {
+  color: #956b2d;
+  font-size: 13px;
+}
+
+/* ===== 三期：设置页分区 ===== */
+
+.settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border: 1px solid #b4c9bd;
+  border-radius: 999px;
+  background: transparent;
+  color: #285858;
+  font-size: 13px;
+}
+
+.settings-tabs button.active {
+  background: #285858;
+  border-color: #285858;
+  color: #fff;
+}
+
+.settings-panel {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+}
+
+.settings-option-static {
+  cursor: default;
+}
+
+.settings-option-static:hover {
+  border-color: #dfe9e3;
+  box-shadow: none;
+  transform: none;
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid #dfe9e3;
+  border-radius: 8px;
+  background: #fff;
+  color: #285858;
+  font-size: 14px;
+}
+
+.settings-field small,
+.settings-switch small {
+  color: #779087;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.settings-field select,
+.settings-feedback select,
+.settings-feedback input,
+.settings-feedback textarea {
+  padding: 10px;
+  border: 1px solid #d4e1d9;
+  border-radius: 6px;
+  background: #fff;
+  color: #172326;
+}
+
+.settings-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px;
+  border: 1px solid #dfe9e3;
+  border-radius: 8px;
+  background: #fff;
+  color: #285858;
+  font-size: 14px;
+}
+
+.settings-switch span {
+  display: grid;
+  gap: 6px;
+}
+
+.settings-switch input[type='checkbox'] {
+  width: 20px;
+  height: 20px;
+  accent-color: #285858;
+}
+
+.policy-panel,
+.settings-about {
+  display: grid;
+  gap: 8px;
+  padding: 18px;
+  border: 1px solid #dfe9e3;
+  border-radius: 8px;
+  background: #fbfdfb;
+}
+
+.policy-panel h4,
+.settings-about h3,
+.settings-about h4 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #285858;
+  font-size: 15px;
+}
+
+.policy-panel p,
+.settings-about p {
+  color: #59766c;
+  font-size: 13px;
+  line-height: 1.75;
+}
+
+.settings-about ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: #59766c;
+  font-size: 13px;
+}
+
+.settings-feedback {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #dfe9e3;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.settings-feedback h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #285858;
+  font-size: 16px;
+}
+
+.settings-feedback label {
+  display: grid;
+  gap: 8px;
+  color: #285858;
+  font-size: 13px;
+}
+
+.settings-feedback textarea {
+  resize: vertical;
+}
+
+/* ===== 三期：管理后台扩展 ===== */
+
+.admin-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 14px;
+}
+
+.admin-filter-bar label {
+  display: grid;
+  gap: 6px;
+  color: #285858;
+  font-size: 13px;
+}
+
+.admin-filter-bar select,
+.admin-filter-bar input {
+  padding: 9px 10px;
+  border: 1px solid #d4e1d9;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.admin-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #285858;
+  font-size: 13px;
+}
+
+.admin-checkbox input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: #285858;
+}
+
+.management-form label {
+  display: grid;
+  gap: 6px;
+  color: #285858;
+  font-size: 13px;
+}
+
+.management-form select {
+  padding: 9px 10px;
+  border: 1px solid #d4e1d9;
+  border-radius: 6px;
+  background: #fff;
+  color: #172326;
+}
+
+.log-table {
+  display: grid;
+  border: 1px solid #e0e9e3;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.log-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr 2fr 1.2fr;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #e0e9e3;
+  background: #fff;
+  font-size: 13px;
+  color: #59766c;
+}
+
+.log-row:last-child {
+  border-bottom: 0;
+}
+
+.log-row-head {
+  background: #fbfdfb;
+  color: #8aa097;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.log-row time {
+  color: #779087;
+  font-size: 12px;
+}
+
+/* ===== 三期：字号与主题 ===== */
+
+html.mh-font-small {
+  font-size: 14px;
+}
+
+html.mh-font-medium {
+  font-size: 16px;
+}
+
+html.mh-font-large {
+  font-size: 18px;
+}
+
+html.mh-theme-dark {
+  background: #101c1c;
+  color: #dfeae5;
+}
+
+html.mh-theme-dark body {
+  background: #101c1c;
+  color: #dfeae5;
+}
+
+html.mh-theme-dark main {
+  background: #101c1c;
+}
+
+html.mh-theme-dark header {
+  border-bottom-color: #263c3d;
+}
+
+html.mh-theme-dark h1,
+html.mh-theme-dark h2,
+html.mh-theme-dark h3,
+html.mh-theme-dark h4 {
+  color: #eef5f1;
+}
+
+html.mh-theme-dark .scale-card,
+html.mh-theme-dark .article,
+html.mh-theme-dark .assessment-form,
+html.mh-theme-dark .profile-card,
+html.mh-theme-dark .auth-card,
+html.mh-theme-dark .modal,
+html.mh-theme-dark .editor-modal,
+html.mh-theme-dark .analysis-modal,
+html.mh-theme-dark .announcement-modal,
+html.mh-theme-dark .announcement-detail-modal,
+html.mh-theme-dark .diary-modal,
+html.mh-theme-dark .settings-option,
+html.mh-theme-dark .settings-field,
+html.mh-theme-dark .settings-switch,
+html.mh-theme-dark .settings-feedback,
+html.mh-theme-dark .archived-sessions-panel,
+html.mh-theme-dark .management-form,
+html.mh-theme-dark .management-item,
+html.mh-theme-dark .diary-composer,
+html.mh-theme-dark .diary-section,
+html.mh-theme-dark .diary-entry,
+html.mh-theme-dark .history-item,
+html.mh-theme-dark .overview-chart-panel,
+html.mh-theme-dark .audit-panel,
+html.mh-theme-dark .metric-card,
+html.mh-theme-dark .report,
+html.mh-theme-dark .relax-panel,
+html.mh-theme-dark .meditation-card,
+html.mh-theme-dark .extras-panel,
+html.mh-theme-dark .notification-card,
+html.mh-theme-dark .policy-panel,
+html.mh-theme-dark .settings-about,
+html.mh-theme-dark .chat-intro,
+html.mh-theme-dark .recommendation-list li,
+html.mh-theme-dark .favorite-message-list li,
+html.mh-theme-dark .relax-history li,
+html.mh-theme-dark .favorite-toggle-list li,
+html.mh-theme-dark .comparison-list li,
+html.mh-theme-dark .log-row {
+  background: #182a2b;
+  border-color: #2a4142;
+  color: #dfeae5;
+}
+
+html.mh-theme-dark .log-row-head {
+  background: #14242a;
+  color: #9fb8af;
+}
+
+html.mh-theme-dark .management-item-copy strong,
+html.mh-theme-dark .management-form h3,
+html.mh-theme-dark .metric-card strong,
+html.mh-theme-dark .settings-option-copy strong,
+html.mh-theme-dark .settings-field,
+html.mh-theme-dark .settings-switch,
+html.mh-theme-dark .session-item strong,
+html.mh-theme-dark .scale-card-copy h3,
+html.mh-theme-dark .article-card-copy h3,
+html.mh-theme-dark .diary-entry-meta strong,
+html.mh-theme-dark .recommendation-copy strong,
+html.mh-theme-dark .notification-card-head strong,
+html.mh-theme-dark .relax-panel-head,
+html.mh-theme-dark .extras-panel-head,
+html.mh-theme-dark .relax-history h4,
+html.mh-theme-dark .extras-subheading,
+html.mh-theme-dark .settings-feedback h3,
+html.mh-theme-dark .policy-panel h4,
+html.mh-theme-dark .settings-about h3,
+html.mh-theme-dark .settings-about h4,
+html.mh-theme-dark .favorite-message-list li p,
+html.mh-theme-dark .favorite-toggle-list li span {
+  color: #dfeae5;
+}
+
+html.mh-theme-dark .management-item-copy p,
+html.mh-theme-dark .management-heading p,
+html.mh-theme-dark .settings-option-copy small,
+html.mh-theme-dark .settings-field small,
+html.mh-theme-dark .settings-switch small,
+html.mh-theme-dark .diary-entry > p,
+html.mh-theme-dark .scale-card-copy p,
+html.mh-theme-dark .meditation-card p,
+html.mh-theme-dark .recommendation-copy p,
+html.mh-theme-dark .notification-card p,
+html.mh-theme-dark .policy-panel p,
+html.mh-theme-dark .settings-about p,
+html.mh-theme-dark .relax-panel-head p,
+html.mh-theme-dark .extras-panel-head p,
+html.mh-theme-dark .relax-heading p,
+html.mh-theme-dark .extras-heading p,
+html.mh-theme-dark .helper,
+html.mh-theme-dark .empty-state,
+html.mh-theme-dark .loading-state {
+  color: #9fb8af;
+}
+
+html.mh-theme-dark .bubble {
+  background: #1e3132;
+  border-color: #2a4142;
+  color: #e6f0eb;
+}
+
+html.mh-theme-dark .message.user .bubble {
+  background: #2f6b58;
+  color: #f4fbf5;
+}
+
+html.mh-theme-dark input,
+html.mh-theme-dark textarea,
+html.mh-theme-dark select {
+  background: #12201f;
+  border-color: #2a4142;
+  color: #e6f0eb;
+}
+
+html.mh-theme-dark .composer {
+  background: #182a2b;
+  border-color: #2a4142;
+}
+
+html.mh-theme-dark .notification-tabs button,
+html.mh-theme-dark .settings-tabs button,
+html.mh-theme-dark .secondary {
+  border-color: #2f4a4a;
+  color: #b7d3c9;
+}
+
+html.mh-theme-dark .notification-tabs button.active,
+html.mh-theme-dark .settings-tabs button.active {
+  background: #2f6b58;
+  border-color: #2f6b58;
+  color: #f4fbf5;
+}
+
+html.mh-theme-dark .notification-card.unread {
+  background: #1d2f2a;
+}
+
+html.mh-theme-dark .crisis-banner,
+html.mh-theme-dark .meditation-player {
+  background: #2a2417;
+  border-color: #4a3c22;
+  color: #e4c68c;
+}
+
+html.mh-theme-dark .crisis-banner p,
+html.mh-theme-dark .meditation-player h4,
+html.mh-theme-dark .meditation-player p,
+html.mh-theme-dark .meditation-player small {
+  color: #e4c68c;
+}
+/* ===== 三期：设置保存反馈 ===== */
+
+.settings-save-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.settings-save-hint {
+  padding: 7px 12px;
+  border-radius: 6px;
+  background: #e5f0e9;
+  color: #2f6b58;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.settings-save-hint.error {
+  background: #f7e6e4;
+  color: #a95d58;
+}
+
+.toast {
+  z-index: 70;
+}
+
+html.mh-theme-dark .settings-save-hint {
+  background: #1d2f2a;
+  color: #b7d3c9;
+}
+
+html.mh-theme-dark .settings-save-hint.error {
+  background: #33221f;
+  color: #e5a9a2;
+}
+
+html.mh-theme-dark .settings-fixed {
+  border-color: #2a4142;
 }
