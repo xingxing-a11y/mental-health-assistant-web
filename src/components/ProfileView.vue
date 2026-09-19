@@ -38,7 +38,7 @@ function avatarSource(url) {
   if (!url) {
     return '';
   }
-  return url.startsWith('http') ? url : `/api/v1${url}`;
+  return `/api/v1${url}`;
 }
 
 function chooseAvatar() {
