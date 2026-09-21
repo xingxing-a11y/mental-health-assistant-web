@@ -29,7 +29,7 @@ const emit = defineEmits(['open', 'back', 'search']);
     </div>
     <div v-if="selectedArticle" class="article-detail">
       <button class="text-button article-back" type="button" @click="emit('back')">
-        <ArrowLeft :size="16" />
+        <ArrowLeft :size="15" />
         返回文章列表
       </button>
       <div class="article-detail-head">

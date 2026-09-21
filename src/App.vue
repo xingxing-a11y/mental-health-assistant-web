@@ -863,12 +863,26 @@ async function submitAssessment() {
     };
   });
 
-  report.value = await assessmentApi.submit({
+  // 报告 VO 不含作答数据，保留一份在 report 里，表单提交后仍能正常渲染。
+  const submittedAnswers = report.value.answers;
+  const submittedOther = report.value.otherAnswers || {};
+  const result = await assessmentApi.submit({
     scaleId: selectedScale.value.id,
     answers,
   });
+  report.value = {
+    ...result,
+    answers: submittedAnswers,
+    otherAnswers: submittedOther,
+  };
   assessmentHistory.value = await assessmentApi.history();
   notify('测评报告已生成');
+}
+
+/** 返回量表列表，清空当前作答状态。 */
+function exitAssessment() {
+  selectedScale.value = null;
+  report.value = null;
 }
 
 async function analyzeAssessment() {
@@ -1145,6 +1159,25 @@ function refreshBellCounters() {
 
 watch(userSettings, (settings) => applyAppearance(settings));
 
+// 管理端发布量表或文章后，已打开的页面不会自行感知；每次切到对应导航就重拉一次
+// 列表，新内容无需刷新页面即可出现。重拉失败保留现有列表，静默降级，
+// 下一次进入该导航时会再次尝试。
+watch(active, async (view) => {
+  if (!authenticated.value) {
+    return;
+  }
+
+  try {
+    if (view === 'assessment') {
+      scales.value = (await assessmentApi.scales()) || [];
+    } else if (view === 'articles') {
+      articles.value = (await articleApi.list()) || [];
+    }
+  } catch {
+    // 拉取失败不打断用户当前页面，保留旧列表。
+  }
+});
+
 onMounted(() => {
   applyLocation();
   window.addEventListener('popstate', applyLocation);
@@ -1186,7 +1219,7 @@ onBeforeUnmount(() => {
     />
 
     <main :class="{ 'settings-layout': active === 'settings' }">
-      <header>
+      <header class="app-header">
         <button class="icon mobile-menu" @click="mobileOpen = true">
           <Menu :size="21" />
         </button>
@@ -1274,6 +1307,7 @@ onBeforeUnmount(() => {
         @start="startAssessment"
         @submit="submitAssessment"
         @analyze="analyzeAssessment"
+        @back="exitAssessment"
         :analysis-loading="assessmentAnalysisLoading"
       />
       <ArticleView

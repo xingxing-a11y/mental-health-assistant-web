@@ -41,7 +41,7 @@ const emit = defineEmits([
 ]);
 
 const input = ref('');
-const sessionWidth = ref(280);
+const sessionWidth = ref(320);
 const renamingId = ref(null);
 const renameValue = ref('');
 const renameInput = ref(null);

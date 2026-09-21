@@ -3,7 +3,7 @@
 :root {
   font-family: 'DM Sans', system-ui, sans-serif;
   color: #172326;
-  background: #f5f7f5;
+  background: #e7efe8;
   line-height: 1.5;
 }
 
@@ -70,14 +70,24 @@ button {
 }
 
 .icon {
-  background: transparent;
-  color: inherit;
+  background: #e9f0e9;
+  color: #285858;
   padding: 8px;
   border-radius: 8px;
 }
 
+.icon:hover {
+  background: #e5f0e9;
+}
+
 .mobile-close, .mobile-menu {
   display: none;
+}
+
+/* 深色侧栏上的移动端关闭钮：.icon 浅底在侧栏上不可读，改用半透明白 */
+.mobile-close {
+  background: rgba(255, 255, 255, 0.08);
+  color: #aac7bc;
 }
 
 nav {
@@ -158,12 +168,16 @@ nav button:hover {
 }
 
 .logout {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.08);
   color: #aac7bc;
   display: flex;
   gap: 10px;
   padding: 10px 8px;
   text-align: left;
+}
+
+.logout:hover {
+  background: rgba(255, 255, 255, 0.14);
 }
 
 main {
@@ -173,7 +187,8 @@ main {
   overflow-y: auto;
 }
 
-header {
+/* 仅限应用顶栏（App.vue），不得命中弹窗等其它 header */
+.app-header {
   height: 100px;
   padding: 28px 48px;
   display: flex;
@@ -227,7 +242,7 @@ h1 {
 }
 
 .notification-trigger:hover, .notification-trigger[aria-expanded='true'] {
-  background: #e5f0e9;
+  background: #f0f0f0;
 }
 
 .notification-badge {
@@ -444,10 +459,13 @@ h1 {
 .profile-trigger {
   color: #172326;
   padding: 4px 6px;
+  background: transparent;
+  border-radius: 10px;
 }
 
-.profile-trigger:hover {
-  background: #e5f0e9;
+.profile-trigger:hover,
+.profile-trigger[aria-expanded='true'] {
+  background: #f0f0f0;
 }
 
 .profile-menu {
@@ -709,7 +727,6 @@ main.settings-layout > header {
 
 .content {
   padding: 40px 48px;
-  max-width: 1200px;
 }
 
 .chat-layout {
@@ -747,20 +764,23 @@ main.settings-layout > header {
   font-size: 13px;
 }
 
+/* 会话列表：独立白色圆角卡片（原先靠 border-right 与对话区相隔） */
 .session-panel {
   min-height: 0;
   overflow-y: auto;
-  border-right: 1px solid #dfe8e2;
-  padding-right: 24px;
+  padding: 0 22px 20px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(23, 58, 58, 0.06);
 }
 
 .session-panel .panel-head {
   position: sticky;
   top: 0;
   z-index: 2;
-  margin: 0 -1px 12px 0;
-  padding: 0 0 12px;
-  background: transparent;
+  margin: 0 0 12px;
+  padding: 20px 0 12px;
+  background: #fff;
   box-shadow: none;
 }
 
@@ -774,12 +794,15 @@ main.settings-layout > header {
 }
 
 .session-panel .panel-head .primary:not(.disclaimer-open) {
-  background: transparent;
-  color: #285858;
+  background: #e4b86a;
+  color: #173a3a;
 }
 
 .session-panel .panel-head .primary.disclaimer-open {
-  background: transparent;
+  /* 遮罩 z-index 已高于 .panel-head，按钮会被遮罩正常压暗，
+     保持本体金色即可，压暗后的观感与左上角 Logo 一致 */
+  background: #e4b86a;
+  color: #173a3a;
 }
 
 .chat-layout.disclaimer-open .session-panel .panel-head {
@@ -877,11 +900,16 @@ main.settings-layout > header {
   color: #a95d58;
 }
 
+/* 对话窗口：白色圆角卡片；overflow:hidden 让顶部 .chat-intro 跟随圆角裁切 */
 .chat-panel {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  padding-bottom: 16px;
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(23, 58, 58, 0.06);
 }
 
 .chat-intro {
@@ -946,7 +974,7 @@ main.settings-layout > header {
   max-width: 75%;
   padding: 13px 16px;
   border-radius: 12px 12px 12px 3px;
-  background: white;
+  background: #f2f7f3;
   border: 1px solid #dfebe4;
   white-space: pre-wrap;
 }
@@ -1003,9 +1031,13 @@ main.settings-layout > header {
 }
 
 .secondary {
-  background: transparent;
-  border: 1px solid #b4c9bd;
+  background: #e5f0e9;
+  border: 1px solid #cfe0d3;
   color: #285858;
+}
+
+.secondary:hover {
+  background: #d8e8dc;
 }
 
 .notice {
@@ -1027,6 +1059,15 @@ main.settings-layout > header {
   border: 1px solid #e0e9e3;
   padding: 24px;
   border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(23, 58, 58, 0.06);
+}
+
+/* 同款轻投影：让白卡片从薄荷底色上浮起（清单镜像暗色主题卡片族） */
+.auth-card, .profile-form, .management-form, .management-item, .metric-card,
+.overview-chart-panel, .notification-card, .diary-composer, .diary-section,
+.relax-panel, .meditation-card, .extras-panel, .policy-panel, .settings-field,
+.settings-option {
+  box-shadow: 0 2px 10px rgba(23, 58, 58, 0.06);
 }
 
 .assessment-page, .article-page {
@@ -1142,10 +1183,13 @@ main.settings-layout > header {
   gap: 6px;
 }
 
+.article-back {
+  justify-self: start;
+}
+
 .article-detail {
   display: grid;
   gap: 18px;
-  max-width: 860px;
   padding: 30px;
   border: 1px solid #e0e9e3;
   border-top: 3px solid #dba95d;
@@ -1242,7 +1286,7 @@ main.settings-layout > header {
   display: flex;
   gap: 24px;
   align-items: center;
-  background: #e5f0e9;
+  background: white;
 }
 
 .profile-avatar-wrap {
@@ -1318,6 +1362,7 @@ main.settings-layout > header {
 
 .modal-backdrop {
   position: fixed;
+  z-index: 60;
   inset: 0;
   background: #102c2c80;
   display: grid;
@@ -1367,6 +1412,232 @@ main.settings-layout > header {
 
 .confirm-modal-danger:hover {
   background: #93463f;
+}
+
+/* ===== 查看问卷弹窗：纸质手账风 ===== */
+
+.scale-view-modal {
+  width: min(720px, 100%);
+  max-width: min(720px, 100%);
+  max-height: min(82vh, 760px);
+  overflow-y: auto;
+  border: 1px solid #dbe7de;
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(16, 44, 44, 0.28);
+
+  /* 顶部一层薄荷色带随滚动固定，像手账封面的题签 */
+  background:
+    linear-gradient(180deg, #eaf4ec 0%, rgba(234, 244, 236, 0) 150px),
+    #fdfefc;
+}
+
+.scale-view-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  padding-bottom: 18px;
+  border-bottom: 3px double #cfe0d3;
+}
+
+.scale-view-head h2 {
+  margin-top: 8px;
+  color: #285858;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.scale-view-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 0;
+  color: #779087;
+  font-size: 13px;
+}
+
+.scale-view-dot {
+  color: #cba45e;
+}
+
+.scale-view-close {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border: 1px solid #d4e1d9;
+  border-radius: 999px;
+  color: #4d6a60;
+  font-size: 13px;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.scale-view-close:hover {
+  border-color: #9ec3b2;
+  background: #f3f9f5;
+  color: #285858;
+}
+
+.scale-view-close:focus-visible {
+  outline: 2px solid #2f6b58;
+  outline-offset: 2px;
+}
+
+/* 简介做成金签引文块 */
+.scale-view-description {
+  margin: 16px 0 0;
+  padding: 10px 14px;
+  border-left: 3px solid #dba95d;
+  border-radius: 0 8px 8px 0;
+  background: #faf6ec;
+  color: #5c6f63;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.scale-view-list {
+  display: grid;
+  gap: 14px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scale-view-question {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid #e3ece5;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(40, 88, 88, 0.05);
+}
+
+.scale-view-question-title {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.scale-view-question-title b {
+  flex: 0 0 auto;
+  min-width: 30px;
+  padding: 3px 0;
+  border-radius: 999px;
+  background: #f4ede0;
+  color: #956b2d;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.scale-view-question-text {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.scale-view-question-text span {
+  color: #334f46;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.scale-view-question-text em {
+  flex: 0 0 auto;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #eef4ee;
+  color: #4d6a60;
+  font-size: 11px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+/* 选项清单：虚线分隔 + 装饰性答题圈，还原纸质问卷的样子 */
+.scale-view-options {
+  display: grid;
+  margin: 0;
+  padding: 0 0 0 42px;
+  list-style: none;
+}
+
+.scale-view-options li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 2px;
+  border-bottom: 1px dashed #dce7df;
+  color: #4d6a60;
+  font-size: 13px;
+}
+
+.scale-view-options li:last-child {
+  border-bottom: none;
+}
+
+.scale-view-options li::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #b9cdbf;
+  border-radius: 50%;
+}
+
+.scale-view-options small {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #faf6ec;
+  color: #956b2d;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.scale-view-matrix {
+  margin: 0;
+  padding-left: 42px;
+  color: #779087;
+  font-size: 12px;
+}
+
+.scale-view-foot {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px dashed #dce7df;
+  color: #8aa097;
+  font-size: 12px;
+}
+
+/* 入场编排：弹窗整体浮入，题卡错峰上浮（最多 8 档封顶） */
+@media (prefers-reduced-motion: no-preference) {
+  .scale-view-modal {
+    animation: scale-view-in 320ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .scale-view-question {
+    animation: scale-view-rise 360ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+    animation-delay: calc(80ms + min(var(--i, 0), 8) * 60ms);
+  }
+
+  @keyframes scale-view-in {
+    from {
+      opacity: 0;
+      transform: translateY(18px) scale(0.98);
+    }
+  }
+
+  @keyframes scale-view-rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
 }
 
 .expandable-editor {
@@ -1556,11 +1827,13 @@ main.settings-layout > header {
 
 .assessment-question {
   display: grid;
-  gap: 10px;
-  padding: 18px;
+  gap: 12px;
+  padding: 20px;
   border: 1px solid #e0e9e3;
-  border-radius: 8px;
-  background: #fbfdfb;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(40, 88, 88, 0.05);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .assessment-question-title {
@@ -1573,8 +1846,13 @@ main.settings-layout > header {
 
 .assessment-question-title b {
   flex: 0 0 auto;
+  min-width: 28px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f4ede0;
   color: #956b2d;
   font-size: 12px;
+  text-align: center;
 }
 
 .assessment-submit {
@@ -1664,6 +1942,74 @@ main.settings-layout > header {
   border: 1px solid #d4e1d9;
   border-radius: 6px;
   resize: vertical;
+}
+
+.assessment-form-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.assessment-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #59766c;
+  font-size: 12px;
+}
+
+.assessment-back:hover {
+  color: #285858;
+}
+
+.assessment-submit-row {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.assessment-missing-warning {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid #e3b1ac;
+  border-radius: 8px;
+  background: #fdf1f0;
+  color: #a94440;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.assessment-question-missing {
+  border-color: #c2564f;
+  background: #fdf4f3;
+  box-shadow: 0 0 0 3px rgba(194, 86, 79, 0.1);
+}
+
+.assessment-question-missing .assessment-question-title {
+  color: #a94440;
+}
+
+.assessment-question-missing .assessment-question-title b {
+  background: #f7dedb;
+  color: #a94440;
+}
+
+.assessment-form select:focus,
+.assessment-form textarea:focus,
+.other-answer-input:focus {
+  border-color: #2f6b58;
+  outline: 2px solid rgba(47, 107, 88, 0.15);
+}
+
+.assessment-option:hover {
+  border-color: #9ec3b2;
+  background: #f3f9f5;
+}
+
+.secondary:disabled,
+.text-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .trend-list {
@@ -1858,8 +2204,15 @@ main.settings-layout > header {
 }
 
 .text-button {
-  background: transparent;
+  background: #edf3ee;
   color: #2f6b58;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.text-button:hover {
+  background: #e5f0e9;
 }
 
 .auth-subtitle {
@@ -1876,6 +2229,9 @@ main.settings-layout > header {
   gap: 12px;
   max-width: 520px;
   margin-top: 20px;
+  /* grid 默认 align-content:stretch 会把最后一项（提交按钮）拉高，
+     右卡少一个字段时按钮就比左卡高；按内容高度排列可让两个按钮等高 */
+  align-content: start;
 }
 
 .profile-form label {
@@ -2245,7 +2601,12 @@ main.settings-layout > header {
 }
 
 .danger-button {
+  background: #f6e7e5;
   color: #a95d58;
+}
+
+.danger-button:hover {
+  background: #eed8d5;
 }
 
 .diary-empty {
@@ -2268,7 +2629,7 @@ main.settings-layout > header {
   padding: 18px 20px;
   border: 1px solid #d7e4dc;
   border-radius: 8px;
-  background: #e5f0e9;
+  background: white;
 }
 
 .metric-card strong {
@@ -2422,18 +2783,74 @@ main.settings-layout > header {
 
 .admin-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr auto;
+  /* 末列不能用 auto：auto 随各行内容变化（表头「操作」24px、按钮 66px），
+     会让每行的列轨道不同、表头与数据行列对不齐；固定列宽后各行轨道一致 */
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 76px;
   gap: 14px;
   align-items: center;
-  padding: 12px 0;
+  padding: 12px 16px;
   border-bottom: 1px solid #e0e9e3;
+  background: #fff;
+}
+
+/* 末列变宽后，按钮保持自身宽度并贴右对齐（与列内右对齐的表头文字同一基线） */
+.admin-row > button {
+  justify-self: end;
 }
 
 .user-row-head {
-  padding: 0 0 8px;
+  padding: 0 16px 8px;
   color: #8aa097;
   font-size: 12px;
   font-weight: 700;
+}
+
+.user-row-head > span:last-child {
+  text-align: right;
+}
+
+/* 注销用户行的末列是文本而非按钮：同样贴右，否则与表头「操作」不在同一右基线 */
+.admin-row > .management-count {
+  padding-top: 0;
+  text-align: right;
+}
+
+/* 账号多时：表头固定在滚动区顶部，只有账号行可以上下滑动。
+   表头与数据行同处这个容器，滚动条占位对两者一致，行宽始终相同 */
+.user-table-scroll {
+  display: grid;
+  gap: 10px;
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.user-table-scroll .user-row-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 12px 16px;
+  background: #fff;
+}
+
+/* 表头与首行之间那道 10px 空隙是透明的，行滚上来会从缝里露出来 → 用页底色的遮罩盖住 */
+.user-table-scroll .user-row-head::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 10px;
+  background: #e7efe8;
+}
+
+.user-table-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.user-table-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #cfdcd5;
 }
 
 .favorites-toggle {
@@ -2698,7 +3115,7 @@ main.settings-layout > header {
     color: #173a3a;
     margin-right: 8px;
   }
-  header {
+  .app-header {
     padding: 20px 22px;
     height: 84px;
   }
@@ -2713,10 +3130,6 @@ main.settings-layout > header {
   }
   .profile-card {
     align-items: flex-start;
-  }
-  .session-panel {
-    border-right: 0;
-    padding-right: 0;
   }
   .profile-trigger span:not(.avatar) {
     display: none;
@@ -3524,21 +3937,35 @@ html.mh-font-large {
 }
 
 html.mh-theme-dark {
-  background: #101c1c;
+  background: #0c1717;
   color: #dfeae5;
 }
 
 html.mh-theme-dark body {
-  background: #101c1c;
+  background: #0c1717;
   color: #dfeae5;
 }
 
 html.mh-theme-dark main {
-  background: #101c1c;
+  background: #0c1717;
 }
 
-html.mh-theme-dark header {
+html.mh-theme-dark .app-header {
   border-bottom-color: #263c3d;
+}
+
+html.mh-theme-dark .notification-trigger:hover,
+html.mh-theme-dark .notification-trigger[aria-expanded='true'] {
+  background: #243d3e;
+}
+
+html.mh-theme-dark .profile-trigger {
+  background: transparent;
+}
+
+html.mh-theme-dark .profile-trigger:hover,
+html.mh-theme-dark .profile-trigger[aria-expanded='true'] {
+  background: #243d3e;
 }
 
 html.mh-theme-dark h1,
@@ -3590,6 +4017,57 @@ html.mh-theme-dark .log-row {
   background: #182a2b;
   border-color: #2a4142;
   color: #dfeae5;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+html.mh-theme-dark .session-panel {
+  background: #182a2b;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+html.mh-theme-dark .chat-panel {
+  background: #182a2b;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+/* 对话卡片上的引导条：与卡片同色会消失，比卡片浅一档 */
+html.mh-theme-dark .chat-intro {
+  background: #1e3132;
+}
+
+html.mh-theme-dark .session-panel .panel-head {
+  background: #182a2b;
+}
+
+/* 拖动条：亮色 #dfe8e2 在深色留白里过于刺眼，回落一档 */
+html.mh-theme-dark .chat-divider {
+  background: #2a4142;
+}
+
+html.mh-theme-dark .session-row {
+  border-bottom-color: #2a4142;
+}
+
+html.mh-theme-dark .admin-row {
+  background: #182a2b;
+  border-bottom-color: #2a4142;
+}
+
+html.mh-theme-dark .user-table-scroll .user-row-head {
+  background: #182a2b;
+}
+
+html.mh-theme-dark .user-table-scroll .user-row-head::after {
+  background: #0c1717;
+}
+
+html.mh-theme-dark .user-table-scroll::-webkit-scrollbar-thumb {
+  background: #2f4a4b;
+}
+
+html.mh-theme-dark .profile-form {
+  background: #182a2b;
+  border-color: #2a4142;
 }
 
 html.mh-theme-dark .log-row-head {
@@ -3675,6 +4153,42 @@ html.mh-theme-dark .secondary {
   color: #b7d3c9;
 }
 
+/* 暗色按钮底色：镜像亮色的「一档底、hover 加深一档」 */
+html.mh-theme-dark .secondary {
+  background: #1d3334;
+}
+
+html.mh-theme-dark .secondary:hover {
+  background: #243d3e;
+}
+
+html.mh-theme-dark .text-button {
+  background: #1d3334;
+  color: #9fc6b4;
+}
+
+html.mh-theme-dark .text-button:hover {
+  background: #243d3e;
+}
+
+html.mh-theme-dark .danger-button {
+  background: #3a2624;
+  color: #d8a09b;
+}
+
+html.mh-theme-dark .danger-button:hover {
+  background: #452e2c;
+}
+
+html.mh-theme-dark .icon {
+  background: #1d3334;
+  color: #b7d3c9;
+}
+
+html.mh-theme-dark .icon:hover {
+  background: #243d3e;
+}
+
 html.mh-theme-dark .notification-tabs button.active,
 html.mh-theme-dark .settings-tabs button.active {
   background: #2f6b58;
@@ -3739,4 +4253,99 @@ html.mh-theme-dark .settings-save-hint.error {
 
 html.mh-theme-dark .settings-fixed {
   border-color: #2a4142;
+}
+html.mh-theme-dark .scale-view-modal {
+  background:
+    linear-gradient(180deg, rgba(47, 107, 88, 0.22) 0%, rgba(47, 107, 88, 0) 150px),
+    #1c3434;
+  border-color: #2f4a4a;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+}
+
+html.mh-theme-dark .scale-view-head {
+  border-bottom-color: #2f4a4a;
+}
+
+html.mh-theme-dark .scale-view-head h2 {
+  color: #b7d3c9;
+}
+
+html.mh-theme-dark .scale-view-dot {
+  color: #d3ab63;
+}
+
+html.mh-theme-dark .scale-view-close {
+  border-color: #2f4a4a;
+  color: #b7d3c9;
+}
+
+html.mh-theme-dark .scale-view-close:hover {
+  border-color: #3d6353;
+  background: #223c3c;
+  color: #d9ece2;
+}
+
+html.mh-theme-dark .scale-view-description {
+  border-left-color: #b98a3e;
+  background: #223c3c;
+  color: #9db8ac;
+}
+
+html.mh-theme-dark .scale-view-question {
+  border-color: #2f4a4a;
+  background: #223c3c;
+  box-shadow: none;
+}
+
+html.mh-theme-dark .scale-view-question-title b {
+  background: #3a3324;
+  color: #d3ab63;
+}
+
+html.mh-theme-dark .scale-view-question-text span {
+  color: #cfe3d8;
+}
+
+html.mh-theme-dark .scale-view-question-text em {
+  background: #1c3434;
+  color: #9db8ac;
+}
+
+html.mh-theme-dark .scale-view-options li {
+  border-bottom-color: #2f4a4a;
+  color: #b7d3c9;
+}
+
+html.mh-theme-dark .scale-view-options li::before {
+  border-color: #47635a;
+}
+
+html.mh-theme-dark .scale-view-options small {
+  background: #3a3324;
+  color: #d3ab63;
+}
+
+html.mh-theme-dark .scale-view-matrix {
+  color: #7f9a8d;
+}
+
+html.mh-theme-dark .scale-view-foot {
+  border-top-color: #2f4a4a;
+  color: #7f9a8d;
+}
+
+html.mh-theme-dark .assessment-question-missing {
+  border-color: #b05a54;
+  background: #3a2726;
+  box-shadow: 0 0 0 3px rgba(176, 90, 84, 0.18);
+}
+
+html.mh-theme-dark .assessment-question-missing .assessment-question-title {
+  color: #e79b94;
+}
+
+html.mh-theme-dark .assessment-missing-warning {
+  border-color: #6e3f3b;
+  background: #3a2726;
+  color: #e79b94;
 }

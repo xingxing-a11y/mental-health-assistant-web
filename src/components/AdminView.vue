@@ -22,6 +22,9 @@ const scaleForm = ref({ name: '', description: '', applicableScene: '' });
 const editingScaleId = ref(null);
 const questionScaleId = ref(null);
 const questionForm = ref([]);
+const viewingScale = ref(null);
+const viewQuestions = ref([]);
+const viewLoading = ref(false);
 const saving = ref(false);
 const audits = ref([]);
 const statistics = ref(null);
@@ -249,15 +252,22 @@ async function saveScale() {
   editingScaleId.value = null;
 }
 
+/** 发布后前端会锁定量表信息和题目维护，属于不可逆操作，先弹窗确认再执行。 */
+function requestPublish(scale) {
+  askConfirm({
+    title: '发布量表',
+    message: `确定发布量表「${scale.name}」吗？发布后用户即可看到并作答，量表信息和题目将不能再修改。`,
+    confirmText: '发布量表',
+    errorMessage: '发布失败，请先添加题目',
+    action: () => publishScale(scale),
+  });
+}
+
 async function publishScale(scale) {
-  try {
-    const published = await adminApi.publishScale(scale.id);
-    const index = scales.value.findIndex((item) => item.id === scale.id);
-    if (index !== -1) {
-      scales.value[index] = published;
-    }
-  } catch (err) {
-    setError(err.message || '发布失败，请先添加题目');
+  const published = await adminApi.publishScale(scale.id);
+  const index = scales.value.findIndex((item) => item.id === scale.id);
+  if (index !== -1) {
+    scales.value[index] = published;
   }
 }
 
@@ -288,6 +298,39 @@ function deleteScale(scale) {
     errorMessage: '量表删除失败',
     action: () => removeScale(scale),
   });
+}
+
+const QUESTION_TYPE_LABELS = {
+  SINGLE: '单选题',
+  MULTIPLE: '多选题',
+  JUDGE: '判断题',
+  TEXT: '文字题',
+  MATRIX: '矩阵题',
+};
+
+function questionTypeLabel(type) {
+  return QUESTION_TYPE_LABELS[type] || '题目';
+}
+
+/** 只读查看问卷内容，不提供任何修改入口。 */
+async function viewScale(scale) {
+  viewLoading.value = true;
+  viewingScale.value = scale;
+  viewQuestions.value = [];
+  try {
+    const detail = await assessmentApi.detail(scale.id);
+    viewQuestions.value = detail.questions || [];
+  } catch (requestError) {
+    setError(requestError.message || '问卷内容加载失败');
+    viewingScale.value = null;
+  } finally {
+    viewLoading.value = false;
+  }
+}
+
+function closeScaleView() {
+  viewingScale.value = null;
+  viewQuestions.value = [];
 }
 
 async function removeArticle(article) {
@@ -946,15 +989,26 @@ onBeforeUnmount(() => {
           <p>{{ scale.description || '暂无量表简介。' }}</p>
         </div>
         <div class="management-actions">
-          <button class="secondary" type="button" @click="editQuestions(scale)">维护题目</button>
+          <button class="secondary" type="button" @click="viewScale(scale)">查看</button>
+          <button
+            v-if="!scale.published"
+            class="secondary"
+            type="button"
+            @click="editQuestions(scale)"
+          >维护题目</button>
           <button
             v-if="!scale.published"
             class="secondary publish-button"
             type="button"
-            @click="publishScale(scale)"
+            @click="requestPublish(scale)"
           >发布</button>
           <span v-else class="status-chip status-success">已发布</span>
-          <button class="text-button" type="button" @click="editScale(scale)">编辑</button>
+          <button
+            v-if="!scale.published"
+            class="text-button"
+            type="button"
+            @click="editScale(scale)"
+          >编辑</button>
           <button class="text-button danger-button" type="button" @click="deleteScale(scale)">删除</button>
         </div>
       </article>
@@ -1178,33 +1232,35 @@ onBeforeUnmount(() => {
         </button>
       </form>
       <div v-if="!users.length" class="empty-state">暂无用户。</div>
-      <div v-else class="admin-row user-row-head">
-        <span>账号</span>
-        <span>用户名</span>
-        <span>状态</span>
-        <span>操作</span>
-      </div>
-      <article v-for="user in users" :key="user.id" class="admin-row">
-        <span>{{ user.username }}</span>
-        <span>{{ user.nickname }}</span>
-        <span>
-          <span
-            class="status-chip"
-            :class="user.status === 'ACTIVE' ? 'status-success' : 'status-pending'"
-          >
-            {{ statusLabel(user.status) }}
+      <div v-else class="user-table-scroll">
+        <div class="admin-row user-row-head">
+          <span>账号</span>
+          <span>用户名</span>
+          <span>状态</span>
+          <span>操作</span>
+        </div>
+        <article v-for="user in users" :key="user.id" class="admin-row">
+          <span>{{ user.username }}</span>
+          <span>{{ user.nickname }}</span>
+          <span>
+            <span
+              class="status-chip"
+              :class="user.status === 'ACTIVE' ? 'status-success' : 'status-pending'"
+            >
+              {{ statusLabel(user.status) }}
+            </span>
           </span>
-        </span>
-        <button
-          v-if="user.status !== 'CLOSED'"
-          class="secondary"
-          type="button"
-          @click="toggleUser(user)"
-        >
-          {{ user.status === 'ACTIVE' ? '禁用' : '启用' }}
-        </button>
-        <span v-else class="management-count">账号已注销</span>
-      </article>
+          <button
+            v-if="user.status !== 'CLOSED'"
+            class="secondary"
+            type="button"
+            @click="toggleUser(user)"
+          >
+            {{ user.status === 'ACTIVE' ? '禁用' : '启用' }}
+          </button>
+          <span v-else class="management-count">账号已注销</span>
+        </article>
+      </div>
       <div v-if="userPage.totalPages > 1" class="pagination">
         <button
           class="text-button"
@@ -1565,6 +1621,60 @@ onBeforeUnmount(() => {
     </section>
   </div>
 
+  <div v-if="viewingScale" class="modal-backdrop" @click.self="closeScaleView">
+    <section
+      class="modal scale-view-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="scale-view-title"
+    >
+      <header class="scale-view-head">
+        <div>
+          <span class="eyebrow">QUESTIONNAIRE</span>
+          <h2 id="scale-view-title">{{ viewingScale.name }}</h2>
+          <p class="scale-view-meta">
+            共 {{ viewQuestions.length }} 道题目
+            <span class="scale-view-dot">·</span>
+            {{ viewingScale.applicableScene || '未设置适用场景' }}
+            <span v-if="viewingScale.published" class="status-chip status-success">已发布</span>
+          </p>
+        </div>
+        <button class="text-button scale-view-close" type="button" @click="closeScaleView">关闭</button>
+      </header>
+      <p v-if="viewingScale.description" class="scale-view-description">{{ viewingScale.description }}</p>
+      <div v-if="viewLoading" class="empty-state">问卷内容加载中...</div>
+      <div v-else-if="!viewQuestions.length" class="empty-state">该量表暂无题目。</div>
+      <ol v-else class="scale-view-list">
+        <li
+          v-for="(question, questionIndex) in viewQuestions"
+          :key="question.id"
+          class="scale-view-question"
+          :style="{ '--i': questionIndex }"
+        >
+          <div class="scale-view-question-title">
+            <b>{{ String(questionIndex + 1).padStart(2, '0') }}</b>
+            <div class="scale-view-question-text">
+              <span>{{ question.content }}</span>
+              <em>{{ questionTypeLabel(question.type) }}</em>
+            </div>
+          </div>
+          <ul v-if="question.options?.length" class="scale-view-options">
+            <li v-for="option in question.options" :key="option.id">
+              <span>{{ option.label }}</span>
+              <small>{{ option.score }} 分</small>
+            </li>
+          </ul>
+          <p
+            v-if="question.type === 'MATRIX' && question.matrixRows"
+            class="scale-view-matrix"
+          >
+            矩阵行：{{ question.matrixRows.split('\n').filter(Boolean).join('、') }}
+          </p>
+        </li>
+      </ol>
+      <footer class="scale-view-foot">此处仅预览问卷内容，不支持在预览中修改。</footer>
+    </section>
+  </div>
   <ConfirmDialog
     :visible="Boolean(pendingConfirm)"
     :title="pendingConfirm ? pendingConfirm.title : '操作确认'"
