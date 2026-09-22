@@ -1,0 +1,706 @@
+/*
+ * 放松小游戏：游戏列表、游戏弹窗与三个游戏的样式。
+ *
+ * 这些规则原先散在 style.css 里（亮色段 + 文件末的暗色镜像），因为 style.css 是
+ * CRCRLF 行尾、每次都只能走字节级脚本改，所以整体搬到这个纯 LF 的新文件里。
+ * main.js 在 style.css 之后 import 本文件，覆盖顺序与原先一致。
+ *
+ * 本文件内源码顺序**不可调换**：基础规则 → 800px → 720px → 暗色。
+ * 媒体查询不提高 specificity，窄屏覆盖只能靠「写在后面」取胜。
+ */
+
+/* ===== 游戏列表与卡片 ===== */
+
+.game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.game-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 14px;
+  padding: 20px;
+  border: 1px solid #dfe9e3;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(23, 58, 58, 0.06);
+}
+
+.game-card-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: #eef5f0;
+  color: #2f6d64;
+}
+
+.game-card-copy {
+  min-width: 0;
+}
+
+.game-card-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #285858;
+}
+
+.game-card-title strong {
+  font-size: 16px;
+}
+
+.game-card-title small {
+  color: #8aa39a;
+  font-size: 12px;
+}
+
+.game-card-copy p {
+  margin-top: 6px;
+  color: #668078;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+/* 「开始游戏」独占一行，几张卡片的高度更容易对齐 */
+.game-card .primary-button {
+  grid-column: 1 / -1;
+  justify-content: center;
+}
+
+/* ===== 游戏弹窗 ===== */
+
+/*
+ * 弹窗铺满侧边栏右侧的内容区：左内边距 = 常规边距 + 侧边栏宽度，
+ * 再让 grid item 拉伸填满剩余的内容盒。
+ *
+ * 侧边栏宽度不写字面量，读 --mh-sidebar-w（style.css 的 :root 里定义）。
+ * 带 252px 作 fallback：万一 token 没插进去，这里也不会整条声明失效、
+ * 静默回落到 .modal-backdrop 的 padding。
+ */
+.game-backdrop {
+  padding: 24px;
+  padding-left: calc(24px + var(--mh-sidebar-w, 252px));
+  place-items: stretch;
+}
+
+/*
+ * 尺寸交给 .game-backdrop 的内边距 + stretch 决定，这里不再写 width / height。
+ * 舞台行用 minmax(0, 1fr) 吃掉剩余空间，小视口下也不会把「退出游戏」挤出屏幕。
+ */
+.game-modal {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  padding: 20px 22px 22px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(16, 44, 44, 0.28);
+}
+
+.game-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.game-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.game-modal-title h3 {
+  color: #285858;
+  font-size: 18px;
+}
+
+.game-modal-title p {
+  margin-top: 4px;
+  color: #668078;
+  font-size: 13px;
+}
+
+/* 全弹窗唯一的出口（ESC 走同一条路），做成一眼能找到的实心块 */
+.game-exit {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  background: #edf3ee;
+  color: #2f6d64;
+}
+
+.game-exit:hover {
+  background: #e2ece5;
+}
+
+.game-stage {
+  position: relative;
+  min-height: 0;
+  border: 1px solid #e4ece6;
+  border-radius: 12px;
+  background: #fbfdfb;
+  overflow: hidden;
+}
+
+/* ===== 三个游戏的公共骨架 ===== */
+
+.game-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 18px 20px 20px;
+}
+
+.game-hint {
+  flex: 0 0 auto;
+  color: #4d6a62;
+  font-size: 13.5px;
+  line-height: 1.75;
+}
+
+.game-panel-foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.game-note {
+  color: #8aa39a;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.game-switch {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 退出确认条：浮在弹窗底部，不清空画面也能看清 */
+.game-confirm {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border: 1px solid #e4cfc9;
+  border-radius: 12px;
+  background: #fdf4f2;
+  box-shadow: 0 8px 24px rgba(16, 44, 44, 0.16);
+}
+
+.game-confirm p {
+  color: #7d4a41;
+  font-size: 13px;
+}
+
+.game-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 焦点必须看得见，否则键盘用户等于摸黑 */
+.game-modal :focus-visible {
+  outline: 2px solid #2f6d64;
+  outline-offset: 2px;
+}
+
+/* ===== 游戏一：捏泡泡 ===== */
+
+.game-bubbles-panel .game-hint {
+  flex: 0 0 auto;
+}
+
+.game-bubbles {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px 18px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #eef7f2 0%, #e6f2ec 100%);
+  overflow: auto;
+}
+
+.game-bubble {
+  flex: 0 0 auto;
+  width: clamp(46px, 8vw, 68px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(47, 109, 100, 0.12), inset 0 -4px 10px rgba(255, 255, 255, 0.55);
+  transition: transform 0.26s ease, opacity 0.26s ease, box-shadow 0.2s ease;
+}
+
+.game-bubble--lilac {
+  background: radial-gradient(circle at 32% 28%, #ffffff 0%, #ddd0f0 42%, #c3b0e4 100%);
+}
+
+.game-bubble--pink {
+  background: radial-gradient(circle at 32% 28%, #ffffff 0%, #f6d3de 42%, #eab4c8 100%);
+}
+
+.game-bubble--sky {
+  background: radial-gradient(circle at 32% 28%, #ffffff 0%, #cfe4f5 42%, #aecfea 100%);
+}
+
+/* 捏破：缩下去并淡出，但仍占位 —— 整排不会因此挪动 */
+.game-bubble--popped {
+  transform: scale(0.55);
+  opacity: 0;
+  box-shadow: none;
+}
+
+.game-bubble:not(.game-bubble--popped):hover {
+  transform: translateY(-3px) scale(1.05);
+}
+
+.game-bubble:not(.game-bubble--popped):active {
+  transform: scale(0.92);
+}
+
+/* ===== 游戏二：记忆配对 ===== */
+
+.game-board-panel {
+  overflow: auto;
+}
+
+.game-board {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(72px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.game-flip {
+  min-height: 0;
+  padding: 0;
+  border-radius: 12px;
+  background: transparent;
+  perspective: 800px;
+}
+
+.game-flip-inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  transform-style: preserve-3d;
+  transition: transform 0.42s cubic-bezier(0.2, 0.7, 0.3, 1);
+}
+
+.game-flip--open .game-flip-inner {
+  transform: rotateY(180deg);
+}
+
+/* backface-visibility 必须写：否则翻转时背面朝前的那一面会透出来 */
+.game-flip-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.game-flip-back {
+  border: 1px solid #e9dfc9;
+  background: #fdf7e8;
+  color: #c2ab7c;
+  font-size: 20px;
+  box-shadow: 0 2px 8px rgba(23, 58, 58, 0.06);
+}
+
+.game-flip-front {
+  border: 1px solid #e4ece6;
+  background: #fff;
+  font-size: 30px;
+  transform: rotateY(180deg);
+}
+
+.game-flip--matched .game-flip-front {
+  border-color: #bcdccb;
+  background: #f0f8f3;
+}
+
+.game-done {
+  flex: 0 0 auto;
+  padding: 12px 18px;
+  border: 1px solid #bcdccb;
+  border-radius: 12px;
+  background: #f0f8f3;
+  color: #2f6d64;
+  font-size: 14px;
+  text-align: center;
+  animation: game-fade-in 0.35s ease;
+}
+
+@keyframes game-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ===== 游戏三：静心涂色 ===== */
+
+.game-paint {
+  overflow: hidden;
+}
+
+.game-paint-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 172px minmax(0, 1fr);
+  gap: 14px;
+}
+
+.game-paint-tools {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+  overflow-y: auto;
+}
+
+.game-tool-label {
+  margin-top: 6px;
+  color: #8aa39a;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+}
+
+.game-tool-label:first-child {
+  margin-top: 0;
+}
+
+.game-palette {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.game-swatch {
+  aspect-ratio: 1;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.06);
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.game-swatch:hover {
+  transform: scale(1.1);
+}
+
+.game-swatch--active {
+  border-color: #2f6d64;
+  transform: scale(1.06);
+}
+
+.game-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-range-dot {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #eef3ee;
+}
+
+.game-range-dot span {
+  display: block;
+  border-radius: 50%;
+  background: #7f9a92;
+}
+
+.game-range-dot--active {
+  background: #d9e8e0;
+  box-shadow: inset 0 0 0 2px #2f6d64;
+}
+
+.game-range-dot--active span {
+  background: #2f6d64;
+}
+
+.game-tool-list,
+.game-art-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.game-tool-list .secondary,
+.game-art-list .game-switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.game-tool-list .secondary.is-active,
+.game-art-list .game-switch.is-active {
+  background: #d9e8e0;
+  color: #24564f;
+}
+
+.game-paint-stage {
+  min-height: 0;
+  display: grid;
+  padding: 12px;
+  border-radius: 14px;
+  background: #eef3ee;
+}
+
+/*
+ * 「纸」固定米白，两个主题下都一样 —— 涂色要判断颜色，纸跟着主题变深会让颜色失真。
+ * 同理线稿描边固定深色，不写进暗色镜像。
+ */
+.game-paint-paper {
+  position: relative;
+  min-height: 0;
+  border-radius: 10px;
+  background: #fdfaf1;
+  box-shadow: 0 2px 10px rgba(23, 58, 58, 0.08);
+  overflow: hidden;
+}
+
+.game-paint-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.game-paint-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.game-paint-art path {
+  fill: none;
+  stroke: #3c4a46;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* ===== 窄屏覆盖（必须写在基础规则之后）===== */
+
+@media (max-width: 800px) {
+  /*
+   * ≤800px 时侧边栏变成离屏抽屉、不再占位，左内边距回到常规值。
+   * 这里必须写全值 padding-left：基础规则里的长写只在宽屏成立。
+   */
+  .game-backdrop {
+    padding-left: 24px;
+  }
+
+  .game-paint-body {
+    grid-template-columns: 148px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  /* 简写会重置四边，正好覆盖上面那条 padding-left —— 顺序对了才生效 */
+  .game-backdrop {
+    padding: 10px;
+  }
+
+  /* 这里不再写 height：尺寸交给 stretch，写死会让弹窗与内容盒对不上 */
+  .game-modal {
+    padding: 14px 14px 16px;
+  }
+
+  .game-modal-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .game-modal-title p {
+    display: none;
+  }
+
+  .game-exit {
+    justify-content: center;
+  }
+
+  .game-panel {
+    padding: 14px 12px 16px;
+  }
+
+  .game-paint-body {
+    grid-template-columns: 128px minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .game-bubble {
+    width: clamp(40px, 13vw, 56px);
+  }
+}
+
+/* ===== 暗色主题镜像（方案 B「墨黑青金」，2026-09-22 与 style.css 同步）===== */
+
+html.mh-theme-dark .game-card,
+html.mh-theme-dark .game-modal {
+  background: #161b1e;
+  border-color: #313b41;
+  color: #ecf1ef;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+}
+
+html.mh-theme-dark .game-card-icon {
+  background: #212a2e;
+  color: #34b184;
+}
+
+html.mh-theme-dark .game-card-title,
+html.mh-theme-dark .game-modal-title h3 {
+  color: #ecf1ef;
+}
+
+html.mh-theme-dark .game-card-copy p,
+html.mh-theme-dark .game-modal-title p {
+  color: #a2abaa;
+}
+
+html.mh-theme-dark .game-card-title small {
+  color: #7e8886;
+}
+
+html.mh-theme-dark .game-exit {
+  background: #212a2e;
+  color: #34b184;
+}
+
+html.mh-theme-dark .game-exit:hover {
+  background: #2a363b;
+}
+
+html.mh-theme-dark .game-stage {
+  border-color: #313b41;
+  background: #11161a;
+}
+
+html.mh-theme-dark .game-hint {
+  color: #a2abaa;
+}
+
+html.mh-theme-dark .game-note {
+  color: #7e8886;
+}
+
+html.mh-theme-dark .game-bubbles {
+  background: linear-gradient(180deg, #161b1e 0%, #0c1012 100%);
+}
+
+html.mh-theme-dark .game-flip-back {
+  border-color: #313b41;
+  background: #212a2e;
+  color: #7e8886;
+}
+
+html.mh-theme-dark .game-flip-front {
+  border-color: #313b41;
+  background: #161b1e;
+}
+
+html.mh-theme-dark .game-flip--matched .game-flip-front {
+  border-color: #14795c;
+  background: #16302a;
+}
+
+html.mh-theme-dark .game-done {
+  border-color: #14795c;
+  background: #16302a;
+  color: #34b184;
+}
+
+html.mh-theme-dark .game-tool-label {
+  color: #7e8886;
+}
+
+html.mh-theme-dark .game-paint-stage {
+  background: #161b1e;
+}
+
+html.mh-theme-dark .game-range-dot {
+  background: #212a2e;
+}
+
+html.mh-theme-dark .game-range-dot span {
+  background: #34b184;
+}
+
+html.mh-theme-dark .game-range-dot--active {
+  background: #2a363b;
+  box-shadow: inset 0 0 0 2px #34b184;
+}
+
+html.mh-theme-dark .game-range-dot--active span {
+  background: #ecf1ef;
+}
+
+html.mh-theme-dark .game-tool-list .secondary.is-active,
+html.mh-theme-dark .game-art-list .game-switch.is-active {
+  background: #2a363b;
+  color: #ecf1ef;
+}
+
+html.mh-theme-dark .game-confirm {
+  border-color: #8a4d47;
+  background: #3a2624;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+html.mh-theme-dark .game-confirm p {
+  color: #e5a09a;
+}
+
+html.mh-theme-dark .game-modal :focus-visible {
+  outline-color: #34b184;
+}

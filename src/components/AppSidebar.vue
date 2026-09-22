@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   Compass,
   FileText,
+  Gamepad2,
   GitCompare,
   Gauge,
   History,
@@ -136,6 +137,13 @@ function toggleGroup(group) {
         >
           <Gauge :size="16" />
           压力打卡
+        </button>
+        <button
+          :class="{ active: active === 'relax' && relaxSection === 'games' }"
+          @click="emit('select-relax', 'games')"
+        >
+          <Gamepad2 :size="16" />
+          游戏列表
         </button>
       </div>
       <button

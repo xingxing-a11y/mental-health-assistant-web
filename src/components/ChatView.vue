@@ -12,6 +12,7 @@ import {
   Send,
   ShieldAlert,
   Sparkles,
+  X,
 } from 'lucide-vue-next';
 
 const props = defineProps({
@@ -242,22 +243,32 @@ function selectSessionAction(action, session) {
           <h2>和我聊聊</h2>
           <p>我会认真听你说，也会在需要时给出温和、具体的建议。</p>
         </div>
-        <div class="intro-controls">
-          <select
-            :value="mode"
-            :disabled="!hasPersistedSession"
-            @change="emit('mode', $event.target.value)"
-          >
-            <option value="COMPANION">温柔陪伴</option>
-            <option value="ANALYTICAL">理性分析</option>
-          </select>
+        <div class="intro-side">
+          <div class="intro-controls">
+            <select
+              :value="mode"
+              :disabled="!hasPersistedSession"
+              @change="emit('mode', $event.target.value)"
+            >
+              <option value="COMPANION">温柔陪伴</option>
+              <option value="ANALYTICAL">理性分析</option>
+            </select>
+            <button
+              class="icon"
+              :disabled="!hasPersistedSession"
+              title="清空上下文"
+              @click="emit('clear', currentSessionId)"
+            >
+              <RotateCcw :size="16" />
+            </button>
+          </div>
           <button
-            class="icon"
-            :disabled="!hasPersistedSession"
-            title="清空上下文"
-            @click="emit('clear', currentSessionId)"
+            class="text-button favorites-toggle"
+            type="button"
+            :aria-expanded="favoritesVisible"
+            @click="favoritesVisible = !favoritesVisible; emit('load-favorites')"
           >
-            <RotateCcw :size="16" />
+            查看当前会话收藏（{{ visibleFavorites.length }}）
           </button>
         </div>
       </div>
@@ -267,25 +278,6 @@ function selectSessionAction(action, session) {
           <strong>需要时可以拨打心理援助热线</strong>
           <p>{{ hotlines.join('　') }}</p>
         </div>
-      </div>
-      <button
-        class="text-button favorites-toggle"
-        type="button"
-        @click="favoritesVisible = !favoritesVisible; emit('load-favorites')"
-      >
-        {{ favoritesVisible ? '收起收藏' : '查看当前会话收藏' }}（{{ visibleFavorites.length }}）
-      </button>
-      <div v-if="favoritesVisible && visibleFavorites.length" class="favorites-list">
-        <article v-for="favorite in visibleFavorites" :key="favorite.id" class="favorite-item">
-          <span>{{ favorite.content }}</span>
-          <button
-            class="text-button"
-            type="button"
-            @click="emit('favorite', { ...favorite, favorite: true })"
-          >
-            取消收藏
-          </button>
-        </article>
       </div>
       <div ref="messagesContainer" class="messages">
         <div
@@ -322,8 +314,50 @@ function selectSessionAction(action, session) {
         <button class="send" :disabled="!input.trim() || !currentSessionId" title="发送">
           <Send :size="18" />
         </button>
+        <p v-if="!input.trim()" class="composer-note">AI 仅提供心理陪伴与科普，不进行医学诊断。</p>
       </form>
-      <p class="helper">AI 仅提供心理陪伴与科普，不进行医学诊断。</p>
+    </div>
+    <div
+      v-if="favoritesVisible"
+      class="modal-backdrop"
+      @click.self="favoritesVisible = false"
+    >
+      <div
+        class="favorites-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="favorites-modal-title"
+      >
+        <div class="favorites-modal-head">
+          <div>
+            <span class="eyebrow">FAVORITES</span>
+            <h2 id="favorites-modal-title">当前会话收藏</h2>
+          </div>
+          <button
+            class="icon"
+            type="button"
+            aria-label="关闭当前会话收藏"
+            title="关闭"
+            @click="favoritesVisible = false"
+          >
+            <X :size="19" />
+          </button>
+        </div>
+        <p class="favorites-modal-meta">共 {{ visibleFavorites.length }} 条收藏</p>
+        <div v-if="!visibleFavorites.length" class="empty-state">当前会话暂无收藏。</div>
+        <div v-else class="favorites-modal-list">
+          <article v-for="favorite in visibleFavorites" :key="favorite.id" class="favorite-item">
+            <span>{{ favorite.content }}</span>
+            <button
+              class="text-button"
+              type="button"
+              @click="emit('favorite', { ...favorite, favorite: true })"
+            >
+              取消收藏
+            </button>
+          </article>
+        </div>
+      </div>
     </div>
   </section>
 </template>

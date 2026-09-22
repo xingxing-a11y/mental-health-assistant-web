@@ -1,9 +1,24 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import * as echarts from 'echarts';
-import { Gauge, Moon, Pause, Play, Square, Wind } from 'lucide-vue-next';
+import {
+  CircleDot,
+  Gamepad2,
+  Gauge,
+  LayoutGrid,
+  Moon,
+  Palette,
+  Pause,
+  Play,
+  Square,
+  Wind,
+} from 'lucide-vue-next';
 import { formatDateTime } from '../utils/dateTime';
 import { relaxApi } from '../api/modules';
+import BubblePopGame from './BubblePopGame.vue';
+import ColorRelaxGame from './ColorRelaxGame.vue';
+import GameModal from './GameModal.vue';
+import MemoryMatchGame from './MemoryMatchGame.vue';
 
 const props = defineProps({
   section: { type: String, default: 'breathe' },
@@ -24,6 +39,38 @@ const BREATH_PHASES = [
   { key: 'INHALE', label: '吸气', hint: '用鼻子缓慢吸气', seconds: 4 },
   { key: 'HOLD', label: '屏息', hint: '轻轻屏住呼吸', seconds: 7 },
   { key: 'EXHALE', label: '呼气', hint: '用嘴缓缓呼气', seconds: 8 },
+];
+
+/**
+ * 放松小游戏。每个游戏都是一个 Vue 组件，由 GameModal 承载。
+ * component / icon 都是组件定义，直接交给 <component :is> 渲染。
+ * 引导文字写在各游戏组件顶部的 .game-hint 里，这里的 description 只用于卡片上的一句话说明。
+ */
+const GAMES = [
+  {
+    id: 'bubble-pop',
+    name: '捏泡泡',
+    tagline: '解压',
+    description: '一整排泡泡，慢慢捏破。没有任务，也没有输赢。',
+    component: BubblePopGame,
+    icon: CircleDot,
+  },
+  {
+    id: 'memory-match',
+    name: '记忆配对',
+    tagline: '静心',
+    description: '翻开卡片寻找相同图案。不限时间，也没有扣分。',
+    component: MemoryMatchGame,
+    icon: LayoutGrid,
+  },
+  {
+    id: 'color-relax',
+    name: '静心涂色',
+    tagline: '放空',
+    description: '用低饱和的颜色涂满线稿。不必好看，也没有对错。',
+    component: ColorRelaxGame,
+    icon: Palette,
+  },
 ];
 
 const overview = ref(null);
@@ -54,6 +101,13 @@ const stressSaving = ref(false);
 const stressTrendChart = ref(null);
 let stressTrendChartInstance;
 
+/*
+ * 当前在弹窗里进行的游戏，为 null 表示弹窗关闭。
+ * 用 shallowRef：game 里放着组件定义（component / icon），深代理会把它们包成响应式
+ * 对象，传给 <component :is> 容易出问题；这里也没有深响应式的必要。
+ */
+const activeGame = shallowRef(null);
+
 const currentPhase = computed(() => BREATH_PHASES[breathPhaseIndex.value]);
 
 const currentMeditation = computed(() => meditations.value.find(
@@ -77,6 +131,18 @@ function formatSeconds(totalSeconds) {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+function openGame(game) {
+  activeGame.value = game;
+}
+
+/**
+ * 退出游戏的唯一入口。弹窗遮罩刻意没绑 click.self，
+ * 点旁边的空白处不会关闭，必须点这个按钮才能离开。
+ */
+function exitGame() {
+  activeGame.value = null;
 }
 
 async function loadOverview() {
@@ -534,5 +600,40 @@ onBeforeUnmount(() => {
         </ul>
       </div>
     </div>
+
+    <div v-else-if="section === 'games'" class="relax-panel">
+      <div class="relax-panel-head">
+        <Gamepad2 :size="20" />
+        <div>
+          <h3>游戏列表</h3>
+          <p>挑一个小游戏玩几分钟。没有任务，没有输赢，想结束时点「退出游戏」就可以了。</p>
+        </div>
+      </div>
+
+      <div class="game-grid">
+        <article v-for="game in GAMES" :key="game.id" class="game-card">
+          <span class="game-card-icon">
+            <component :is="game.icon" :size="22" />
+          </span>
+          <div class="game-card-copy">
+            <div class="game-card-title">
+              <strong>{{ game.name }}</strong>
+              <small>{{ game.tagline }}</small>
+            </div>
+            <p>{{ game.description }}</p>
+          </div>
+          <button class="primary-button" type="button" @click="openGame(game)">
+            <Play :size="15" />
+            开始游戏
+          </button>
+        </article>
+      </div>
+    </div>
+
+    <!--
+      游戏弹窗：遮罩刻意不绑 click.self，点旁边空白处不会退出，只能点「退出游戏」或按 ESC。
+      GameModal 内部 Teleport 到 body，并给背景加上 inert。
+    -->
+    <GameModal v-if="activeGame" :game="activeGame" @close="exitGame" />
   </section>
 </template>

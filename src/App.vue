@@ -167,7 +167,8 @@ function applyLocation() {
   }
 
   const relaxMatch = path.match(/^\/relax\/(.+)$/);
-  if (relaxMatch && ['breathe', 'meditation', 'stress'].includes(relaxMatch[1])) {
+  const relaxSections = ['breathe', 'meditation', 'stress', 'games'];
+  if (relaxMatch && relaxSections.includes(relaxMatch[1])) {
     active.value = 'relax';
     relaxSection.value = relaxMatch[1];
     return;
