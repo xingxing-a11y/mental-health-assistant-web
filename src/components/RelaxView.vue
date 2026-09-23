@@ -51,7 +51,7 @@ const GAMES = [
     id: 'bubble-pop',
     name: '捏泡泡',
     tagline: '解压',
-    description: '一整排泡泡，慢慢捏破。没有任务，也没有输赢。',
+    description: '泡泡散落在画面里，慢慢捏破。没有任务，也没有输赢。',
     component: BubblePopGame,
     icon: CircleDot,
   },
@@ -438,7 +438,8 @@ onBeforeUnmount(() => {
     <p v-if="error" class="form-error">{{ error }}</p>
     <p v-if="message" class="success-message">{{ message }}</p>
 
-    <div class="metric-grid">
+    <!-- 统计卡片服务于呼吸/冥想/压力打卡；游戏页只放游戏本身，省掉这四张无关的卡片 -->
+    <div v-if="section !== 'games'" class="metric-grid">
       <article class="metric-card">
         <span>本周练习次数</span>
         <strong>{{ overview?.weekPracticeCount ?? 0 }}</strong>

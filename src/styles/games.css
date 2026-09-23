@@ -85,6 +85,13 @@
 .game-backdrop {
   padding: 24px;
   padding-left: calc(24px + var(--mh-sidebar-w, 252px));
+  /*
+   * 必须显式写成 minmax(0, 1fr)：自动轨道的最低高度取内容的 min-content，
+   * 涂色页工具栏一高就把弹窗顶到 787px（与视口无关），底部被裁且滚不到
+   * （backdrop 是 fixed，页面滚动条出不来）。钉成 0 之后 place-items: stretch
+   * 才真正把弹窗撑成「视口 − 内边距」，多出来的内容由面板内部自己滚。
+   */
+  grid-template-rows: minmax(0, 1fr);
   place-items: stretch;
 }
 
@@ -226,28 +233,61 @@
 
 /* ===== 游戏一：捏泡泡 ===== */
 
+/* 一轮结束的小提示浮在画面上，所以面板本身要建立定位上下文 */
+.game-bubbles-panel {
+  position: relative;
+}
+
 .game-bubbles-panel .game-hint {
   flex: 0 0 auto;
 }
 
-.game-bubbles {
-  flex: 1;
-  min-height: 0;
+/* 出现方式与泡泡个数两组控制，窄屏下自行换行 */
+.game-bubble-controls {
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
-  align-content: center;
-  justify-content: center;
-  gap: 14px;
-  padding: 24px 18px;
+  gap: 10px 24px;
+}
+
+.game-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.game-control .game-tool-label {
+  margin-top: 0;
+}
+
+.game-select {
+  padding: 6px 9px;
+  border: 1px solid #d4e1d9;
+  border-radius: 6px;
+  background: #fff;
+  color: #172326;
+  font-size: 12.5px;
+}
+
+.game-bubbles {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  /*
+   * 泡泡改成绝对定位随机散布，所以这里不再是 flex 容器、也不留内边距：
+   * 位置由 layoutBubbles() 按可用宽高算出 px 值，四周留白交给 JS 的 STAGE_INSET。
+   */
+  padding: 0;
   border-radius: 14px;
   background: linear-gradient(180deg, #eef7f2 0%, #e6f2ec 100%);
-  overflow: auto;
+  overflow: hidden;
 }
 
 .game-bubble {
-  flex: 0 0 auto;
-  width: clamp(46px, 8vw, 68px);
-  aspect-ratio: 1;
+  position: absolute;
+  /* 直径由 layoutBubbles() 按格子大小算出，经容器上的 CSS 变量下发 */
+  width: var(--game-bubble-size, 64px);
+  height: var(--game-bubble-size, 64px);
   border-radius: 50%;
   box-shadow: 0 4px 12px rgba(47, 109, 100, 0.12), inset 0 -4px 10px rgba(255, 255, 255, 0.55);
   transition: transform 0.26s ease, opacity 0.26s ease, box-shadow 0.2s ease;
@@ -265,11 +305,39 @@
   background: radial-gradient(circle at 32% 28%, #ffffff 0%, #cfe4f5 42%, #aecfea 100%);
 }
 
+/* 随机模式下还没冒出来的泡泡：藏起来但保留占位，整排不会因此跳动 */
+.game-bubble--hidden {
+  transform: scale(0.2);
+  opacity: 0;
+  pointer-events: none;
+}
+
 /* 捏破：缩下去并淡出，但仍占位 —— 整排不会因此挪动 */
 .game-bubble--popped {
   transform: scale(0.55);
   opacity: 0;
   box-shadow: none;
+}
+
+/*
+ * 随机模式的第一颗：点它这一轮才开始，所以用一圈向外扩散的柔光提示「在等你点」。
+ * 只动 box-shadow 不动 transform —— 后者已经被 hover / active 占用，动画和它抢会跳。
+ */
+.game-bubble--starter {
+  animation: game-bubble-breathe 2s ease-in-out infinite;
+}
+
+@keyframes game-bubble-breathe {
+  0%,
+  100% {
+    box-shadow: 0 4px 12px rgba(47, 109, 100, 0.12), inset 0 -4px 10px rgba(255, 255, 255, 0.55),
+      0 0 0 0 rgba(47, 109, 100, 0.34);
+  }
+
+  70% {
+    box-shadow: 0 6px 16px rgba(47, 109, 100, 0.18), inset 0 -4px 10px rgba(255, 255, 255, 0.55),
+      0 0 0 12px rgba(47, 109, 100, 0);
+  }
 }
 
 .game-bubble:not(.game-bubble--popped):hover {
@@ -280,22 +348,105 @@
   transform: scale(0.92);
 }
 
+/*
+ * 一轮结束的小提示：只在画面正中浮一小块，不铺遮罩、不吃点击（pointer-events: none），
+ * 到点由组件里的定时器摘掉。做成一条胶囊提示而不是大弹窗，不打断「一直捏下去」的节奏。
+ */
+.game-result {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.game-result-toast {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 1px solid #d8e8de;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 10px 26px rgba(16, 44, 44, 0.16);
+  color: #2b5a4e;
+  font-size: 13.5px;
+  animation: game-result-pop 0.22s ease-out;
+}
+
+.game-result-check {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e5f0e9;
+  color: #2f6d64;
+}
+
+@keyframes game-result-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.94);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ===== 游戏二：记忆配对 ===== */
 
+/* 只有卡片区滚动，底部提示与「重新开始」要留在原地 */
 .game-board-panel {
-  overflow: auto;
+  overflow: hidden;
+}
+
+.game-board-controls {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+}
+
+.game-board-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-right: 4px;
+  overflow-y: auto;
 }
 
 .game-board {
-  flex: 1;
-  min-height: 0;
+  --game-memory-gap: 12px;
+  --game-memory-card: 126px;
+  /*
+   * 卡片尺寸固定，不随数量缩小；列数上限由组件下发的 --game-memory-cols 决定。
+   * max-width 取「上限列数」的天然宽度再加 1px（抵消亚像素取整），
+   * auto-fill 因此最多只铺这么多列；窗口更窄时自动少排几列、往下换行，
+   * 多出来的行交给 .game-board-scroll 上下滑动。
+   */
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  grid-template-rows: repeat(3, minmax(72px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, var(--game-memory-card));
+  grid-auto-rows: var(--game-memory-card);
+  gap: var(--game-memory-gap);
+  justify-content: center;
+  /* 不能收缩：卡片尺寸写死了，被压扁就等于又把尺寸缩回去了 */
+  flex: 0 0 auto;
   width: 100%;
-  max-width: 620px;
-  margin: 0 auto;
+  max-width: calc(
+    var(--game-memory-cols, 6) * (var(--game-memory-card) + var(--game-memory-gap))
+      - var(--game-memory-gap) + 1px
+  );
+  /*
+   * auto 外边距：装得下时上下居中；装不下时自动归零、从顶部开始滚。
+   * 这里不能用 justify-content: center 代替 —— 溢出时它会把第一行推到滚动区上方，再也滚不到。
+   */
+  margin: auto 0;
 }
 
 .game-flip {
@@ -412,6 +563,8 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
+  /* 2px 内缩：hover 放大时圆环也不会顶到滚动容器边缘被裁 */
+  padding: 2px;
 }
 
 .game-swatch {
@@ -423,12 +576,53 @@
 }
 
 .game-swatch:hover {
-  transform: scale(1.1);
+  transform: scale(1.08);
 }
 
 .game-swatch--active {
+  /*
+   * 只用本来就预留好的 2px border 表示选中：不放大、几何零变化，
+   * 否则 scale 会把圆环挤出工具栏这个滚动容器，左侧被裁掉一截。
+   */
   border-color: #2f6d64;
-  transform: scale(1.06);
+}
+
+/*
+ * 原生取色器：把 <input type="color"> 铺满外层并透明化，外观完全由 .game-picker 决定。
+ * 点色块或右边的文字（label 会转发点击）都会打开系统调色盘，可选颜色远超色板的 10 个。
+ */
+.game-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.game-picker {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  box-shadow: inset 0 -2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.game-picker-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.game-picker-hint {
+  color: #8aa39a;
+  font-size: 12px;
 }
 
 .game-range {
@@ -442,6 +636,11 @@
   place-items: center;
   width: 34px;
   height: 34px;
+  /*
+   * 必须显式归零：项目全局的 button 只重置了 border，浏览器默认的 1px 6px padding
+   * 会把内容区压到只剩 22px 宽，最大的 32px 圆点因此横向溢出，看着就像没居中。
+   */
+  padding: 0;
   border-radius: 50%;
   background: #eef3ee;
 }
@@ -461,11 +660,35 @@
   background: #2f6d64;
 }
 
-.game-tool-list,
+/*
+ * 两列网格。原来用 flex 换行时，「保存图片」四个字放不进半行，四个按钮会排成
+ * 一列占掉 216px，把整个工具栏顶高 121px，连最底部的线稿区都被挤出可视区。
+ */
+.game-tool-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.game-tool-list .secondary {
+  padding: 6px 8px;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+
+/*
+ * 20 张线稿排成两列并限高滚动。全铺开会把工具栏撑得很长、把舞台挤扁，
+ * 做成独立滚动区比让整个工具栏一起滚更好找。
+ */
 .game-art-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  /* 不参与 flex 收缩：否则会被工具栏压到不足 100px 高，一次只看得到两三个形状 */
+  flex: 0 0 auto;
+  max-height: 208px;
+  padding-right: 4px;
+  overflow-y: auto;
 }
 
 .game-tool-list .secondary,
@@ -474,12 +697,22 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .game-tool-list .secondary.is-active,
 .game-art-list .game-switch.is-active {
   background: #d9e8e0;
   color: #24564f;
+}
+
+/*
+ * 撤销 / 重做没得可退时置灰。不用 pointer-events: none —— 那会连 not-allowed 光标一起掐掉，
+ * 用户点上去完全没反馈，反倒像是坏了。
+ */
+.game-tool-list .secondary:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
 }
 
 .game-paint-stage {
@@ -542,6 +775,16 @@
   .game-paint-body {
     grid-template-columns: 148px minmax(0, 1fr);
   }
+
+  /* 工具栏变窄后两列放不下「保存图片」，退回单列 */
+  .game-tool-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* 卡片整体调小一档，列数仍由 --game-memory-cols 封顶 */
+  .game-board {
+    --game-memory-card: 112px;
+  }
 }
 
 @media (max-width: 720px) {
@@ -578,8 +821,13 @@
     gap: 10px;
   }
 
-  .game-bubble {
-    width: clamp(40px, 13vw, 56px);
+  .game-board {
+    --game-memory-card: 96px;
+  }
+
+  .game-result-toast {
+    padding: 9px 14px;
+    font-size: 12.5px;
   }
 }
 
@@ -636,6 +884,36 @@ html.mh-theme-dark .game-note {
 
 html.mh-theme-dark .game-bubbles {
   background: linear-gradient(180deg, #161b1e 0%, #0c1012 100%);
+}
+
+html.mh-theme-dark .game-bubble--starter {
+  animation-name: game-bubble-breathe-dark;
+}
+
+/* 暗色下外扩柔光换成青绿，内层高光压掉 —— 白高光落在深底上很刺眼 */
+@keyframes game-bubble-breathe-dark {
+  0%,
+  100% {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 -4px 10px rgba(255, 255, 255, 0.08),
+      0 0 0 0 rgba(52, 177, 132, 0.38);
+  }
+
+  70% {
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.36), inset 0 -4px 10px rgba(255, 255, 255, 0.08),
+      0 0 0 12px rgba(52, 177, 132, 0);
+  }
+}
+
+html.mh-theme-dark .game-result-toast {
+  border-color: #313b41;
+  background: #161b1e;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.42);
+  color: #cfe6dc;
+}
+
+html.mh-theme-dark .game-result-check {
+  background: #212a2e;
+  color: #34b184;
 }
 
 html.mh-theme-dark .game-flip-back {
@@ -703,4 +981,18 @@ html.mh-theme-dark .game-confirm p {
 
 html.mh-theme-dark .game-modal :focus-visible {
   outline-color: #34b184;
+}
+
+html.mh-theme-dark .game-select {
+  border-color: #313b41;
+  background: #11161a;
+  color: #ecf1ef;
+}
+
+html.mh-theme-dark .game-picker {
+  border-color: #313b41;
+}
+
+html.mh-theme-dark .game-picker-hint {
+  color: #7e8886;
 }
