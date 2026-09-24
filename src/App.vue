@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { Bell, Menu, Settings, UserRound, X } from 'lucide-vue-next';
+import { Bell, Menu, MessagesSquare, Settings, UserRound, X } from 'lucide-vue-next';
 import AppSidebar from './components/AppSidebar.vue';
 import ArticleView from './components/ArticleView.vue';
 import AssessmentView from './components/AssessmentView.vue';
@@ -29,10 +29,12 @@ import {
   userApi,
 } from './api/modules';
 import { formatDateTime } from './utils/dateTime';
+import { NAV_GROUPS, defaultSections, sectionKeys } from './navigation';
 
 const active = ref('chat');
 const adminSection = ref(null);
 const mobileOpen = ref(false);
+const sessionDrawerOpen = ref(false);
 const profileMenuOpen = ref(false);
 const announcementModalOpen = ref(false);
 const selectedAnnouncement = ref(null);
@@ -137,16 +139,18 @@ const titles = {
   admin: '管理后台',
 };
 
+const sectionDefaults = defaultSections();
+
 const routeDefinitions = {
   '/chat': { active: 'chat' },
   '/assessment': { active: 'assessment' },
   '/articles': { active: 'articles' },
   '/diary': { active: 'diary' },
-  '/relax': { active: 'relax', section: 'breathe' },
-  '/extras': { active: 'extras', section: 'compare' },
+  '/relax': { active: 'relax', section: sectionDefaults.relax },
+  '/extras': { active: 'extras', section: sectionDefaults.extras },
   '/profile': { active: 'profile' },
   '/settings': { active: 'settings' },
-  '/admin': { active: 'admin', section: 'overview' },
+  '/admin': { active: 'admin', section: sectionDefaults.admin },
 };
 
 function navigate(path) {
@@ -155,39 +159,35 @@ function navigate(path) {
   }
 }
 
+/** 把子项写回对应分组的 ref —— 三个分组各自持有独立状态。 */
+function setSection(groupKey, section) {
+  if (groupKey === 'relax') {
+    relaxSection.value = section;
+  } else if (groupKey === 'extras') {
+    extrasSection.value = section;
+  } else if (groupKey === 'admin') {
+    adminSection.value = section;
+  }
+}
+
 function applyLocation() {
   const path = window.location.pathname.toLowerCase();
-  const adminMatch = path.match(/^\/admin\/(.+)$/);
-  const adminSections = ['overview', 'users', 'scales', 'articles', 'knowledge',
-    'announcements', 'push', 'sensitive', 'feedbacks', 'logs'];
-  if (adminMatch && adminSections.includes(adminMatch[1])) {
-    active.value = 'admin';
-    adminSection.value = adminMatch[1];
-    return;
-  }
 
-  const relaxMatch = path.match(/^\/relax\/(.+)$/);
-  const relaxSections = ['breathe', 'meditation', 'stress', 'games'];
-  if (relaxMatch && relaxSections.includes(relaxMatch[1])) {
-    active.value = 'relax';
-    relaxSection.value = relaxMatch[1];
-    return;
-  }
-
-  const extrasMatch = path.match(/^\/extras\/(.+)$/);
-  if (extrasMatch && ['compare', 'favorites', 'recommendations'].includes(extrasMatch[1])) {
-    active.value = 'extras';
-    extrasSection.value = extrasMatch[1];
-    return;
+  // 分组子路径（/relax/xxx、/extras/xxx、/admin/xxx）的合法子项从导航配置派生，
+  // 不再手抄白名单 —— 曾因侧栏与白名单两处不同步，导致刷新时静默回落到聊天页。
+  for (const group of NAV_GROUPS) {
+    const match = path.match(new RegExp(`^/${group.key}/(.+)$`));
+    if (match && sectionKeys(group.key).includes(match[1])) {
+      active.value = group.key;
+      setSection(group.key, match[1]);
+      return;
+    }
   }
 
   const definition = routeDefinitions[path] || routeDefinitions['/chat'];
   active.value = definition.active;
-  if (definition.section && definition.active === 'relax') {
-    relaxSection.value = definition.section;
-  }
-  if (definition.section && definition.active === 'extras') {
-    extrasSection.value = definition.section;
+  if (definition.section) {
+    setSection(definition.active, definition.section);
   }
   if (!routeDefinitions[path]) {
     window.history.replaceState({}, '', '/chat');
@@ -276,11 +276,29 @@ function selectModule(module) {
   };
   navigate(moduleRoutes[module] || '/chat');
   mobileOpen.value = false;
+  sessionDrawerOpen.value = false;
   profileMenuOpen.value = false;
   announcementModalOpen.value = false;
   if (module !== 'settings') {
     archivedSessionsVisible.value = false;
   }
+}
+
+/* 手机上导航栏与会话面板都是左滑抽屉，同开会叠在一起，所以互斥 */
+function openSidebar() {
+  sessionDrawerOpen.value = false;
+  mobileOpen.value = true;
+}
+
+function openSessionDrawer() {
+  mobileOpen.value = false;
+  sessionDrawerOpen.value = true;
+}
+
+/* 点抽屉外的空白（遮罩）收起，两个抽屉一起关 */
+function closeDrawers() {
+  mobileOpen.value = false;
+  sessionDrawerOpen.value = false;
 }
 
 function selectAdminSection(section) {
@@ -1219,11 +1237,30 @@ onBeforeUnmount(() => {
       @logout="logout"
     />
 
+    <!-- 左侧抽屉（导航 / 会话）的遮罩：点空白处即收起。桌面端 CSS 里 display: none -->
+    <div
+      v-if="mobileOpen || sessionDrawerOpen"
+      class="drawer-backdrop"
+      @click="closeDrawers"
+    ></div>
+
     <main :class="{ 'settings-layout': active === 'settings' }">
       <header class="app-header">
-        <button class="icon mobile-menu" @click="mobileOpen = true">
-          <Menu :size="21" />
-        </button>
+        <div class="mobile-header-buttons">
+          <button class="icon mobile-menu" @click="openSidebar">
+            <Menu :size="21" />
+          </button>
+          <button
+            v-if="active === 'chat'"
+            class="icon mobile-sessions"
+            type="button"
+            aria-label="打开会话列表"
+            :aria-expanded="sessionDrawerOpen"
+            @click="openSessionDrawer"
+          >
+            <MessagesSquare :size="20" />
+          </button>
+        </div>
         <div>
           <span class="eyebrow">SPACE FOR YOUR THOUGHTS</span>
           <h1>{{ titles[active] }}</h1>
@@ -1287,6 +1324,7 @@ onBeforeUnmount(() => {
         :disclaimer-visible="disclaimerVisible"
         :crisis-tip="showCrisisTip"
         :hotlines="hotlines"
+        :drawer-open="sessionDrawerOpen"
         @create="createSession"
         @open="openSession"
         @archive="archiveSession"
@@ -1298,6 +1336,7 @@ onBeforeUnmount(() => {
         @favorite="toggleFavorite"
         @load-favorites="loadFavorites"
         @export="exportSession"
+        @close-drawer="sessionDrawerOpen = false"
       />
       <AssessmentView
         v-else-if="active === 'assessment'"

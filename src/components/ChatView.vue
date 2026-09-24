@@ -25,6 +25,7 @@ const props = defineProps({
   disclaimerVisible: { type: Boolean, default: false },
   crisisTip: { type: Boolean, default: false },
   hotlines: { type: Array, default: () => [] },
+  drawerOpen: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -39,6 +40,7 @@ const emit = defineEmits([
   'rename',
   'pin',
   'export',
+  'close-drawer',
 ]);
 
 const input = ref('');
@@ -164,24 +166,42 @@ function selectSessionAction(action, session) {
   <section
     class="content chat-layout"
     :class="{ 'disclaimer-open': props.disclaimerVisible }"
-    :style="{ gridTemplateColumns: `${sessionWidth}px 6px minmax(0, 1fr)` }"
+    :style="{ '--session-w': `${sessionWidth}px` }"
     @click="closeSessionMenuOnOutsideClick"
   >
-    <div class="session-panel">
+    <div class="session-panel" :class="{ open: drawerOpen }">
       <div class="panel-head">
         <h2>我的会话</h2>
-        <button
-          class="primary small"
-          :class="{ 'disclaimer-open': props.disclaimerVisible }"
-          @click="emit('create')"
-        >
-          <Plus :size="16" />
-          新建
-        </button>
+        <div class="panel-head-actions">
+          <button
+            class="primary small"
+            :class="{ 'disclaimer-open': props.disclaimerVisible }"
+            @click="emit('create'); emit('close-drawer')"
+          >
+            <Plus :size="16" />
+            新建
+          </button>
+          <button
+            class="icon mobile-close session-close"
+            type="button"
+            aria-label="收起会话列表"
+            @click="emit('close-drawer')"
+          >
+            <X :size="17" />
+          </button>
+        </div>
       </div>
+      <button
+        class="text-button drawer-favorites"
+        type="button"
+        :aria-expanded="favoritesVisible"
+        @click="favoritesVisible = !favoritesVisible; emit('load-favorites'); emit('close-drawer')"
+      >
+        查看当前会话收藏（{{ visibleFavorites.length }}）
+      </button>
       <div v-if="!sessions.length" class="empty-state">暂无会话。</div>
       <div v-for="session in sessions" :key="session.id" class="session-row">
-        <button class="session-item" @click="emit('open', session)">
+        <button class="session-item" @click="emit('open', session); emit('close-drawer')">
           <input
             v-if="renamingId === session.id"
             :ref="setRenameInput"

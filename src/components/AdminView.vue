@@ -1240,9 +1240,9 @@ onBeforeUnmount(() => {
           <span>操作</span>
         </div>
         <article v-for="user in users" :key="user.id" class="admin-row">
-          <span>{{ user.username }}</span>
-          <span>{{ user.nickname }}</span>
-          <span>
+          <span data-label="账号">{{ user.username }}</span>
+          <span data-label="用户名">{{ user.nickname }}</span>
+          <span data-label="状态">
             <span
               class="status-chip"
               :class="user.status === 'ACTIVE' ? 'status-success' : 'status-pending'"
@@ -1572,11 +1572,11 @@ onBeforeUnmount(() => {
           <span>时间</span>
         </div>
         <div v-for="log in operationLogs" :key="log.id" class="log-row">
-          <span>{{ log.operatorName || '-' }}</span>
-          <span>{{ log.type }}</span>
-          <span>{{ log.targetId ? log.targetType + ' #' + log.targetId : log.targetType }}</span>
-          <span>{{ log.summary }}</span>
-          <time>{{ formatDateTime(log.createdAt) }}</time>
+          <span data-label="操作者">{{ log.operatorName || '-' }}</span>
+          <span data-label="类型">{{ log.type }}</span>
+          <span data-label="目标">{{ log.targetId ? log.targetType + ' #' + log.targetId : log.targetType }}</span>
+          <span data-label="摘要">{{ log.summary }}</span>
+          <time data-label="时间">{{ formatDateTime(log.createdAt) }}</time>
         </div>
       </div>
       <div v-if="operationLogPage.totalPages > 1" class="pagination">

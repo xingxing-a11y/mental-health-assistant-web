@@ -26,6 +26,12 @@ button {
 }
 
 .shell {
+
+  /* 头部高度定义在 .shell 而不是 .app-header：
+     .error-banner 是 header 的兄弟而非子节点，兄弟之间不继承自定义属性，
+     挂在 header 上会让 .error-banner 的 var() 永远落到 fallback 值。 */
+  --header-h: 100px;
+
   height: 100vh;
   display: flex;
   overflow: hidden;
@@ -86,7 +92,12 @@ width: var(--mh-sidebar-w, 252px);
   background: #e5f0e9;
 }
 
-.mobile-close, .mobile-menu {
+.mobile-close, .mobile-menu, .mobile-sessions {
+  display: none;
+}
+
+/* 抽屉遮罩：只在移动端出现（见 800px 断点），点它收起左侧导航 / 会话抽屉 */
+.drawer-backdrop {
   display: none;
 }
 
@@ -94,6 +105,18 @@ width: var(--mh-sidebar-w, 252px);
 .mobile-close {
   background: rgba(255, 255, 255, 0.08);
   color: #aac7bc;
+}
+
+.mobile-header-buttons, .panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 会话抽屉是白底面板，关闭按钮不能沿用侧栏（深青底）的浅色配色 */
+.session-close {
+  background: #e5f0e9;
+  color: #2f6b58;
 }
 
 nav {
@@ -195,7 +218,9 @@ main {
 
 /* 仅限应用顶栏（App.vue），不得命中弹窗等其它 header */
 .app-header {
-  height: 100px;
+
+  /* 高度取 .shell 上的 --header-h，见该变量的注释 */
+  height: var(--header-h);
   padding: 28px 48px;
   display: flex;
   align-items: center;
@@ -736,8 +761,15 @@ main.settings-layout > header {
 }
 
 .chat-layout {
+
+  /* 三列宽度用 CSS 变量而不是行内 grid-template-columns：
+     行内样式优先级高于媒体查询，写成行内会让 <=800px 的单列规则永远覆盖不掉。
+     --session-w 由 ChatView 的拖拽逻辑改写（220~420px）。 */
+  --session-w: 320px;
+  --chat-divider-w: 6px;
+
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: var(--session-w) var(--chat-divider-w) minmax(0, 1fr);
   gap: 32px;
   height: calc(100vh - 100px);
   overflow: hidden;
@@ -1758,7 +1790,9 @@ main.settings-layout > header {
 }
 
 .error-banner {
-  top: 110px;
+
+  /* 110px = 桌面 header 100px + 10px 间隙；用变量后在移动端自动收到 94px */
+  top: calc(var(--header-h, 100px) + 10px);
   bottom: auto;
   background: #a95d58;
 }
@@ -2897,6 +2931,11 @@ main.settings-layout > header {
   background: transparent;
 }
 
+/* 桌面端说明条本身就带收藏入口，抽屉里这份只在手机上出现 */
+.drawer-favorites {
+  display: none;
+}
+
 .favorites-toggle:hover, .favorites-toggle[aria-expanded='true'] {
   background: #f0f0f0;
 }
@@ -3015,94 +3054,6 @@ main.settings-layout > header {
   }
 }
 
-@media (max-width: 700px) {
-  .admin-row {
-    grid-template-columns: 1fr 1fr;
-  }
-  .management-heading {
-    display: grid;
-    gap: 4px;
-  }
-  .management-count {
-    padding-top: 0;
-  }
-  .management-form {
-    padding: 16px;
-  }
-  .management-item {
-    display: grid;
-    gap: 16px;
-    padding: 16px;
-  }
-  .management-item .management-actions {
-    justify-content: flex-start;
-  }
-  .editor-modal-backdrop {
-    padding: 12px;
-  }
-  .editor-modal {
-    max-height: calc(100vh - 24px);
-    padding: 16px;
-  }
-  .editor-modal-head {
-    align-items: flex-start;
-  }
-  .editor-modal-head h2 {
-    font-size: 20px;
-  }
-  .editor-modal-textarea {
-    min-height: 300px;
-    max-height: calc(100vh - 170px);
-  }
-  .question-form-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .option-editor-row {
-    grid-template-columns: 1fr auto;
-  }
-  .option-editor-row input:nth-child(2) {
-    grid-column: 1;
-  }
-  .option-editor-row button {
-    grid-column: 2;
-    grid-row: 1 / span 2;
-  }
-  .user-search {
-    align-items: stretch;
-  }
-  .user-search label {
-    width: 100%;
-  }
-  .user-search input {
-    width: 100%;
-  }
-  .metric-grid {
-    grid-template-columns: 1fr;
-  }
-  .overview-chart-panel, .audit-panel {
-    padding: 16px;
-  }
-  .overview-chart {
-    height: 220px;
-  }
-  .audit-row {
-    grid-template-columns: 1fr auto;
-    gap: 8px 12px;
-  }
-  .audit-row span:nth-child(2) {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    white-space: normal;
-  }
-  .audit-row time {
-    justify-self: end;
-  }
-  .audit-row-head {
-    display: none;
-  }
-}
-
 .assessment-history {
   display: grid;
   gap: 12px;
@@ -3193,29 +3144,121 @@ main.settings-layout > header {
     transform: translateX(-100%);
     transition: .2s;
     width: 260px;
+    /* 顶部留白交给 .brand 自己出（padding-top: 24px），侧栏这里必须归零：
+       sticky 元素的位移不能超出包含块（content box 顶），侧栏留着 padding-top 时
+       .brand 用负 margin 想贴到最上沿会被卡住，钉在 padding 下方 24px 处，
+       上方留出一条缝 —— 侧栏一可滚，导航项就从缝里露出来（用户截图）。 */
+    padding-top: 0;
   }
   .sidebar.open {
     transform: none;
   }
-  .mobile-close, .mobile-menu {
+  /* 点抽屉右侧的空白就收起。z-index 4：低于侧栏(5)与会话抽屉(6)，
+     高于标题栏(2)，所以只盖住主内容区，不会挡住抽屉本身。 */
+  .drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    background: rgba(23, 58, 58, .34);
+  }
+  /* 会话面板同样收成左侧抽屉（与导航栏同一套机制）。
+     fixed 后脱离 .chat-layout 的单列网格，聊天区自然占满整屏；
+     .session-panel .panel-head 本身是 sticky 白底，滚动吸顶可直接复用。 */
+  .session-panel {
+    position: fixed;
+    z-index: 6;
+    inset: 0 auto 0 0;
+    transform: translateX(-100%);
+    transition: .2s;
+    width: min(84vw, 300px);
+    border-radius: 0 16px 16px 0;
+  }
+  .session-panel.open {
+    transform: none;
+  }
+  /* 侧栏自身是 overflow-y: scroll，导航项多时品牌区会跟着滚走（用户截图）。
+     吸附到抽屉顶部；padding-top 自己出 24px 上沿留白（侧栏的 padding-top 已归零），
+     底部再留一段 padding 盖住下面滑上来的内容。
+     margin-top 必须是 0 —— 任何负值都会被 sticky 的包含块约束吃掉，反而露出缝。 */
+  .sidebar .brand {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 24px 8px 12px;
+    margin: 0 0 -12px;
+    background: #173a3a;
+  }
+  .mobile-close, .mobile-menu, .mobile-sessions {
     display: block;
   }
   .mobile-close {
     margin-left: auto;
   }
-  .mobile-menu {
+  .mobile-menu, .mobile-sessions {
     color: #173a3a;
-    margin-right: 8px;
   }
+  /* 100vh 在手机上等于「大视口」（地址栏收起时的高度），比此刻真正看得见的那块
+     高 60~100px。拿它当容器高度，html/body 就会多出一截可滚动空间 ——
+     页面一滑标题栏就被翻上去（用户截图里的现象）；键盘弹出时它也不跟着缩。
+     --vvh 是 main.js 从 visualViewport.height 实时写入的「此刻可见高度」，
+     dvh 兜底，旧浏览器再退到 100vh。 */
+  .shell, main, .sidebar {
+    height: var(--vvh, 100dvh);
+  }
+  .shell {
+    --header-h: 84px;
+  }
+
+  /* 双保险：万一还有别的元素把页面撑出滚动，标题栏也吸在顶部。
+     z-index 2 低于侧栏抽屉（5）与会话抽屉（6），不改变既有层级关系。 */
   .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     padding: 20px 22px;
-    height: 84px;
+    height: var(--header-h);
+    background: #e7efe8;
+  }
+
+  /* 桌面那行 "SPACE FOR YOUR THOUGHTS" 在 ≤390px 会折成两行、把标题往下顶；
+     移动端只留中文标题，并压小字号避免 360px 下「对话陪伴」折行。 */
+  .app-header .eyebrow {
+    display: none;
+  }
+  .app-header h1 {
+    margin-top: 0;
+    font-size: 20px;
+    white-space: nowrap;
   }
   .content {
     padding: 28px 22px;
   }
   .chat-layout, .scale-grid, .article-list {
     grid-template-columns: 1fr;
+  }
+
+  /* 会话面板抽屉化后聊天区拿回固定高度：高度 = 「此刻可见高度 - 标题栏」，
+     于是消息区自己滚、输入框恒在卡片底部，main 也不再有多余滚动。
+     box-sizing 是 border-box，所以这里的高度已含 .content 给的 28/22 内边距。 */
+  .chat-layout {
+    height: calc(var(--vvh, 100dvh) - var(--header-h));
+    overflow: hidden;
+    gap: 16px;
+  }
+
+  /* 单列下拖拽条没有意义，留着会变成一道多余的竖条 */
+  .chat-divider {
+    display: none;
+  }
+
+  /* 提示条贴齐内容区右边距（22px，原为桌面的 24px），
+     长文案允许换行、不横向顶出视口；保持右侧胶囊形态而不是通栏，
+     否则这个 fixed 浮层会横跨整屏压在首张卡片上。 */
+  .toast, .error-banner {
+    right: 22px;
+    left: auto;
+    max-width: calc(100% - 44px);
   }
   .profile-grid {
     grid-template-columns: 1fr;
@@ -3290,12 +3333,95 @@ main.settings-layout > header {
     display: inline-block;
     margin-top: 16px;
   }
+  /* 说明条在手机上一律压成一行：图标 + 标题 + 模式 + 重置。
+     它经历过三代：纵向堆四层（实测 215px）→ 两行（135px）→ 一行。
+     用户反馈「这个区域还是太大了」—— 描述文字是解释性文案，手机上留一行标题足够，
+     改为只在桌面显示；「查看当前会话收藏」移进会话抽屉，抽屉里同样点得到。 */
+  .chat-intro {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  .chat-intro > svg {
+    flex: 0 0 auto;
+    align-self: center;
+    margin-top: 0;
+  }
   .intro-copy {
-    display: grid;
-    gap: 4px;
+    display: block;
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .intro-copy h2 {
+    font-size: 16px;
+    white-space: nowrap;
   }
   .intro-copy p {
-    white-space: normal;
+    display: none;
+  }
+  .intro-side {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    margin-left: 4px;
+    width: auto;
+    min-width: 0;
+    gap: 6px;
+  }
+  .intro-controls {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: 0;
+  }
+  .intro-controls select {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+  .favorites-toggle {
+    display: none;
+  }
+  /* 收藏入口改挂到会话抽屉里（说明条要压成一行，塞不下它） */
+  .drawer-favorites {
+    display: block;
+    margin: 0 0 12px;
+    padding: 4px 8px;
+    font-size: 12px;
+    text-align: left;
+  }
+
+  /* 日记页：左侧说明文字把「保存日记」压成两行（实测高 72px） */
+  .diary-actions {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .diary-actions > span {
+    flex: 1 1 140px;
+    min-width: 0;
+  }
+  .diary-actions .primary-button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+
+  /* 消息收藏的搜索行：手机上一个 flex 行里塞了「图标 + 输入框 + 按钮」，
+     输入框内容宽只剩 148px，而这串中文占位实测需要约 154px —— 末字被切
+     （scrollWidth 174 > clientWidth 168，像素取证墨迹顶到内容盒右边界）。
+     让按钮换行独占一行，输入框拿到整行余量；按钮变大也更好点。
+     ⚠ .extras-search 的 padding / gap 在断点**之后**才定义（文件尾部还有一组同名
+     选择器：.extras-select, .extras-search 给 gap、.extras-search 给 padding）。
+     媒体查询不提升优先级、同特异性后写的赢 —— 在这里写 padding/gap 就是死代码。 */
+  .extras-search {
+    flex-wrap: wrap;
+  }
+  .extras-search input {
+    min-width: 0;
+  }
+  .extras-search button {
+    flex: 1 1 100%;
   }
 }
 
@@ -4014,6 +4140,183 @@ main.settings-layout > header {
   font-size: 12px;
 }
 
+/* 窄屏下管理后台这两张表改成「一行一卡、字段名跟着值走」。
+   原来靠一张共享表头 + 4～5 列网格：手机上每列只剩几十 px，表头与数据行又分属
+   两张卡（中间还隔着 10px 卡片间隙），字段和值对不上；操作日志那 5 列更会被
+   min-content 撑破 .log-table（overflow: hidden），右端「时间」整列被裁掉、
+   「摘要」被压成竖排单字。
+   字段名统一由 AdminView 里的 data-label 提供，不再依赖共享表头。
+   ⚠ 这段必须放在 .log-table / .log-row 的定义之后：媒体查询不提升优先级，
+   同特异性下后写的赢，写在前面就是死代码。 */
+@media (max-width: 700px) {
+  /* ===== 原「管理后台表单 / 编辑弹窗 / 用户搜索 / 概览 / 审计行」一段 =====
+     本文件曾有两段**同条件**的 @media (max-width: 700px)，改窄屏样式时容易只看一段、
+     改了以为不生效。2026-09-24 把前一段合并到这里，两段内部顺序保持原样。
+     ⚠ 本段整体位于 .log-table / .log-row 等基础定义之后（见下方原注释），不要上移。
+     ⚠ 媒体查询不提升优先级：同特异性下后写的赢，所以本段必须在它覆盖的基础定义之后。 */
+  .management-heading {
+    display: grid;
+    gap: 4px;
+  }
+  .management-count {
+    padding-top: 0;
+  }
+  .management-form {
+    padding: 16px;
+  }
+  .management-item {
+    display: grid;
+    gap: 16px;
+    padding: 16px;
+  }
+  .management-item .management-actions {
+    justify-content: flex-start;
+  }
+  .editor-modal-backdrop {
+    padding: 12px;
+  }
+  .editor-modal {
+    max-height: calc(100vh - 24px);
+    padding: 16px;
+  }
+  .editor-modal-head {
+    align-items: flex-start;
+  }
+  .editor-modal-head h2 {
+    font-size: 20px;
+  }
+  .editor-modal-textarea {
+    min-height: 300px;
+    max-height: calc(100vh - 170px);
+  }
+  .question-form-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .option-editor-row {
+    grid-template-columns: 1fr auto;
+  }
+  .option-editor-row input:nth-child(2) {
+    grid-column: 1;
+  }
+  .option-editor-row button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .user-search {
+    align-items: stretch;
+  }
+  .user-search label {
+    width: 100%;
+  }
+  .user-search input {
+    width: 100%;
+  }
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+  .overview-chart-panel, .audit-panel {
+    padding: 16px;
+  }
+  .overview-chart {
+    height: 220px;
+  }
+  .audit-row {
+    grid-template-columns: 1fr auto;
+    gap: 8px 12px;
+  }
+  .audit-row span:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    white-space: normal;
+  }
+  .audit-row time {
+    justify-self: end;
+  }
+  .audit-row-head {
+    display: none;
+  }
+
+  /* ===== 以下是原「表格卡片化」一段 ===== */
+  /* 卡片式下字段名随值出现，共享表头没有意义 */
+  .user-row-head,
+  .log-row-head {
+    display: none;
+  }
+  /* 账号卡片：标签列固定 4.2em，「账号 / 用户名 / 状态」左对齐成一列 */
+  .admin-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+    padding: 12px 14px;
+    border-bottom: 0;
+    border-radius: 12px;
+  }
+  .admin-row > span:not(.management-count) {
+    display: grid;
+    grid-template-columns: 4.2em minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    grid-column: 1;
+  }
+  .admin-row > span:not(.management-count)::before {
+    content: attr(data-label);
+    color: #8aa097;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  /* 末格（启用 / 禁用，或「账号已注销」）与「状态」同行并贴右。
+     grid-row 必须写死：否则 button 的 grid-column: 2 会让它落到第一行右侧 */
+  .admin-row > span:nth-child(3) {
+    grid-row: 3;
+  }
+  /* 只做网格定位：justify-self: end / text-align: right / padding-top: 0
+     由 .admin-row > button 与 .admin-row > .management-count 的基础规则各自负责。
+     合并写会把这几个属性也套到按钮上，把它的高度削掉 11px。 */
+  .admin-row > button,
+  .admin-row > .management-count {
+    grid-column: 2;
+    grid-row: 3;
+  }
+  /* 卡片不再需要「表头吸顶」，内层滚动也去掉，交给页面滚 */
+  .user-table-scroll {
+    max-height: none;
+    overflow-y: visible;
+  }
+  /* 操作日志：外层去掉边框与裁切，每行自成一张卡 */
+  .log-table {
+    display: grid;
+    gap: 10px;
+    border: 0;
+    border-radius: 0;
+    overflow: visible;
+  }
+  .log-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+    padding: 12px 14px;
+    border-bottom: 0;
+    border-radius: 12px;
+  }
+  .log-row > span,
+  .log-row > time {
+    display: grid;
+    grid-template-columns: 4.2em minmax(0, 1fr);
+    align-items: baseline;
+    gap: 10px;
+  }
+  .log-row > span::before,
+  .log-row > time::before {
+    content: attr(data-label);
+    color: #8aa097;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  /* 搜索框给足高度，窄屏下不再有被压成一条线的余地 */
+  .user-search input {
+    min-height: 46px;
+  }
+}
+
 /* ===== 三期：字号与主题 ===== */
 
 html.mh-font-small {
@@ -4050,6 +4353,7 @@ html.mh-theme-dark main {
 
 html.mh-theme-dark .app-header {
   border-bottom-color: #313b41;
+  background: #0c1012;
 }
 
 html.mh-theme-dark .notification-trigger:hover,
@@ -4131,6 +4435,11 @@ html.mh-theme-dark .session-panel {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
+html.mh-theme-dark .session-close {
+  background: #212a2e;
+  color: #a2abaa;
+}
+
 html.mh-theme-dark .chat-panel {
   background: #161b1e;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
@@ -4184,6 +4493,14 @@ html.mh-theme-dark .profile-form {
 
 html.mh-theme-dark .log-row-head {
   background: #212a2e;
+  color: #a2abaa;
+}
+
+/* 卡片式下字段名是 ::before 生成的，暗色要单独镜像。
+   选择器特异性必须与断点里的完全一致（前缀 html.mh-theme-dark），否则盖不住。 */
+html.mh-theme-dark .admin-row > span:not(.management-count)::before,
+html.mh-theme-dark .log-row > span::before,
+html.mh-theme-dark .log-row > time::before {
   color: #a2abaa;
 }
 
