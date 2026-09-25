@@ -831,6 +831,37 @@
   }
 }
 
+/* ===== 宽体弹窗（蜘蛛纸牌：10 列牌桌要尽量大的牌面） =====
+ * 收窄 backdrop / 弹窗 / 面板三层内边距，把空间让给牌桌。
+ * 排在窄屏覆盖段之后：≤800 侧边栏已是离屏抽屉，左内边距不再加回侧栏宽度。
+ */
+.game-backdrop--wide {
+  padding: 12px;
+  padding-left: calc(12px + var(--mh-sidebar-w, 252px));
+}
+
+.game-backdrop--wide .game-modal {
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+
+.game-backdrop--wide .game-panel {
+  gap: 10px;
+  padding: 12px 14px 14px;
+}
+
+@media (max-width: 800px) {
+  .game-backdrop--wide {
+    padding-left: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .game-backdrop--wide {
+    padding: 8px;
+  }
+}
+
 /* ===== 暗色主题镜像（方案 B「墨黑青金」，2026-09-22 与 style.css 同步）===== */
 
 html.mh-theme-dark .game-card,
@@ -996,3 +1027,837 @@ html.mh-theme-dark .game-picker {
 html.mh-theme-dark .game-picker-hint {
   color: #7e8886;
 }
+
+/*
+ * 扫雷（MineSweeperGame.vue）—— 整段追加，自带 @media 与暗色作用域，勿拆分。
+ * 背景与取舍见各段行内注释；类名前缀 .game-mine-，与既有类零重叠。
+ */
+
+/* ===== 基础段：从这一行开始 ===== */
+
+.game-mine-status {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/*
+ * 计数器与计时器都要锁成等宽数字 + 固定最小宽度：
+ * 数字跳动时盒子不跟着抽，不然每跳一秒整行都在抖。
+ */
+.game-mine-counter,
+.game-mine-timer {
+  min-width: 62px;
+  padding: 5px 10px;
+  border: 1px solid #dce6e0;
+  border-radius: 8px;
+  background: #f2f7f3;
+  color: #33544d;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+  text-align: center;
+}
+
+/* 全局 button 只重置了 border，background / border-radius / padding 得自己写 */
+.game-mine-face {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #dce6e0;
+  border-radius: 10px;
+  background: #ffffff;
+  font-size: 20px;
+  line-height: 1;
+  box-shadow: 0 2px 6px rgba(16, 44, 44, 0.1);
+}
+
+.game-mine-face:hover {
+  background: #f4f9f5;
+}
+
+.game-mine-face:active {
+  transform: translateY(1px);
+}
+
+.game-mine-custom {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.game-mine-custom label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.game-mine-input {
+  width: 62px;
+  padding: 5px 8px;
+  border: 1px solid #dce6e0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #33544d;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-mine-error {
+  flex: 1 0 100%;
+  margin: 0;
+  color: #c0564a;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+/*
+ * 滚动层：与 .game-board-scroll 的关键差别有两条 ——
+ *   1) 允许横向滚动。30 列在 360px 上装不下，等比缩小会让格子掉到 ~10px，
+ *      既低于可点击阈值、8 色数字也没法辨认；
+ *   2) 刻意不用 flex + align-items: center。弹性盒在横向溢出时居中，
+ *      会让左端永远滚不到（.game-board-scroll 就有这个毛病）。
+ *      改成块级容器 + 棋盘 margin: 0 auto：宽度小于容器时居中，
+ *      超出时 auto 外边距按 CSS 2.1 §10.3.3 归零，左端一定滚得到。
+ */
+.game-mine-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.game-mine-board {
+  --game-mine-cell: 24px;
+  --game-mine-gap: 2px;
+  display: grid;
+  grid-template-columns: repeat(var(--game-mine-cols, 9), var(--game-mine-cell));
+  gap: var(--game-mine-gap);
+  width: max-content;
+  margin: 0 auto;
+}
+
+.game-mine-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--game-mine-cell);
+  height: var(--game-mine-cell);
+  padding: 0;
+  border: 1px solid #cddcd4;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #f6faf7 0%, #e4ece6 100%);
+  color: #33544d;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  /*
+   * 必须是 manipulation，不能是 none：扫雷只用长按插旗，没有拖拽，
+   * 而 none 会把在格子上发起的平移一并禁掉 —— 高级难度那 30 列
+   * 就再也横滚不到右边了。user-select / touch-callout 负责压掉长按时
+   * 的系统选字与呼出菜单。
+   */
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.game-mine-cell--open {
+  border-color: #e2ece5;
+  background: #fbfdfb;
+  color: #7f9a92;
+  font-weight: 500;
+}
+
+.game-mine-cell--flag {
+  background: linear-gradient(180deg, #fff6e8 0%, #f7e6c9 100%);
+}
+
+.game-mine-cell--mine {
+  background: #eef3f0;
+  color: #33544d;
+}
+
+.game-mine-cell--exploded {
+  border-color: #c8433a;
+  background: #e2564a;
+  color: #ffffff;
+}
+
+.game-mine-cell--wrong {
+  border-color: #edbdb6;
+  background: #fbe3e0;
+  color: #c0564a;
+}
+
+/*
+ * 数字 8 色沿用 Windows 原版配色。这 8 条必须写在 --open 之后：
+ * 它们与 --open 同为单类选择器、特异性相同，靠源码顺序覆盖。
+ */
+.game-mine-cell--n1 {
+  color: #0000ff;
+}
+
+.game-mine-cell--n2 {
+  color: #008000;
+}
+
+.game-mine-cell--n3 {
+  color: #ff0000;
+}
+
+.game-mine-cell--n4 {
+  color: #000080;
+}
+
+.game-mine-cell--n5 {
+  color: #800000;
+}
+
+.game-mine-cell--n6 {
+  color: #008080;
+}
+
+.game-mine-cell--n7 {
+  color: #000000;
+}
+
+.game-mine-cell--n8 {
+  color: #808080;
+}
+
+/* ===== 基础段：到这里结束 ===== */
+
+/*
+ * 窄屏段：自带 @media 作用域（原因见文件头）。断点块必须排在基础规则之后 ——
+ * 媒体查询不提升优先级，同特异性一律靠源码顺序取胜。
+ */
+@media (max-width: 800px) {
+  .game-mine-board {
+    --game-mine-cell: 22px;
+  }
+
+  .game-mine-cell {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .game-mine-board {
+    --game-mine-cell: 20px;
+  }
+
+  .game-mine-cell {
+    font-size: 11px;
+  }
+
+  .game-mine-counter,
+  .game-mine-timer {
+    min-width: 54px;
+    font-size: 14px;
+  }
+}
+
+/* ===== 暗色段：整段追加时排在最后 ===== */
+
+/*
+ * 8 个数字色必须全部重写，不能只改 n4 / n7 / n8：
+ * #0000ff 与 #000 落在 #161b1e 底上基本不可辨。
+ */
+html.mh-theme-dark .game-mine-counter,
+html.mh-theme-dark .game-mine-timer,
+html.mh-theme-dark .game-mine-input {
+  border-color: #313b41;
+  background: #1c2428;
+  color: #cfe0d8;
+}
+
+html.mh-theme-dark .game-mine-face {
+  border-color: #313b41;
+  background: #212a2e;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+html.mh-theme-dark .game-mine-face:hover {
+  background: #2a363b;
+}
+
+html.mh-theme-dark .game-mine-error {
+  color: #ff9b8f;
+}
+
+html.mh-theme-dark .game-mine-cell {
+  border-color: #313b41;
+  background: linear-gradient(180deg, #2a363b 0%, #212a2e 100%);
+  color: #cfe0d8;
+}
+
+html.mh-theme-dark .game-mine-cell--open {
+  border-color: #1d2529;
+  background: #11161a;
+  color: #7e8886;
+}
+
+html.mh-theme-dark .game-mine-cell--flag {
+  background: linear-gradient(180deg, #3a3325 0%, #2c281c 100%);
+}
+
+html.mh-theme-dark .game-mine-cell--mine {
+  background: #232c30;
+  color: #cfe0d8;
+}
+
+html.mh-theme-dark .game-mine-cell--exploded {
+  border-color: #ff8b7d;
+  background: #c8433a;
+  color: #ffffff;
+}
+
+html.mh-theme-dark .game-mine-cell--wrong {
+  border-color: #7a3a34;
+  background: #3a2523;
+  color: #ff9b8f;
+}
+
+html.mh-theme-dark .game-mine-cell--n1 {
+  color: #6f9bff;
+}
+
+html.mh-theme-dark .game-mine-cell--n2 {
+  color: #4fd18b;
+}
+
+html.mh-theme-dark .game-mine-cell--n3 {
+  color: #ff7b70;
+}
+
+html.mh-theme-dark .game-mine-cell--n4 {
+  color: #b48cff;
+}
+
+html.mh-theme-dark .game-mine-cell--n5 {
+  color: #d0a06a;
+}
+
+html.mh-theme-dark .game-mine-cell--n6 {
+  color: #5fd0d0;
+}
+
+html.mh-theme-dark .game-mine-cell--n7 {
+  color: #e6e6e6;
+}
+
+html.mh-theme-dark .game-mine-cell--n8 {
+  color: #9aa5a5;
+}
+
+/* ===== 暗色段结束 ===== */
+
+
+/* ===== 排行榜段（2026-09-25 追加） ===== */
+
+/*
+ * 浮层锚定在 .game-mine 上（position: relative 与蜘蛛 .game-spider 同一模式，
+ * 顺带让 .game-confirm 的锚定从 .game-stage 收窄到面板）。
+ * z-index 取 8：高于面板内普通流，远低于全局遮罩层级（30~50 / 60 / 70）。
+ */
+.game-mine {
+  position: relative;
+}
+
+.game-mine-ranks {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(231, 239, 232, 0.92);
+}
+
+.game-mine-ranks-card {
+  width: min(320px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 18px 20px;
+  border: 1px solid #dce6e0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 14px 30px rgba(16, 44, 44, 0.18);
+}
+
+.game-mine-ranks-card h4 {
+  margin: 0 0 4px;
+  color: #24504a;
+  font-size: 16px;
+}
+
+.game-mine-ranks-note {
+  margin: 0 0 12px;
+  color: #7f9a92;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.game-mine-rank-group {
+  margin: 0 0 12px;
+}
+
+.game-mine-rank-group h5 {
+  margin: 0 0 4px;
+  color: #33544d;
+  font-size: 13px;
+}
+
+.game-mine-rank-group ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.game-mine-rank-group li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.game-mine-rank-empty {
+  margin: 0;
+  color: #7f9a92;
+  font-size: 12.5px;
+}
+
+.game-mine-rank-no {
+  min-width: 20px;
+  color: #7f9a92;
+  font-size: 12px;
+  text-align: right;
+}
+
+.game-mine-rank-time {
+  min-width: 52px;
+  color: #24504a;
+  font-weight: 600;
+}
+
+.game-mine-rank-date {
+  color: #7f9a92;
+  font-size: 12px;
+}
+
+html.mh-theme-dark .game-mine-ranks {
+  background: rgba(17, 22, 26, 0.9);
+}
+
+html.mh-theme-dark .game-mine-ranks-card {
+  border-color: #313b41;
+  background: #1c2428;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+}
+
+html.mh-theme-dark .game-mine-ranks-card h4,
+html.mh-theme-dark .game-mine-rank-time {
+  color: #cfe0d8;
+}
+
+html.mh-theme-dark .game-mine-ranks-note,
+html.mh-theme-dark .game-mine-rank-empty,
+html.mh-theme-dark .game-mine-rank-no,
+html.mh-theme-dark .game-mine-rank-date,
+html.mh-theme-dark .game-mine-rank-group h5 {
+  color: #7e8886;
+}
+
+/* ===== 排行榜段结束 ===== */
+
+/*
+ * 蜘蛛纸牌（SpiderSolitaireGame.vue）—— 整段追加，自带 @supports / @media /
+ * 暗色作用域，勿拆分；@media 800 段为空、刻意不写。
+ * 尺寸口径：卡尺由 --game-spider-card-w 一处定义，字号与影子宽度都从它派生；
+ * 两条硬前提（.game-spider-col 无水平 padding/border、.game-spider-tableau
+ * 无 padding/border）见行内注释，改动前先读。
+ */
+
+/* ===== 基础段：从这一行开始 ===== */
+
+/*
+ * 根上只有这一条：给 .game-confirm 一个定位祖先。
+ * 不加 overflow（会裁掉锚在底部的确认条）、不加 z-index（会另建层叠上下文）。
+ */
+.game-spider {
+  position: relative;
+}
+
+/*
+ * 纵向滚动层。overflow-x 会因此计算为 auto —— 表盘必须绝不横向溢出，
+ * 这一点由「轨道是 minmax(0, 1fr)」从结构上保证。
+ */
+.game-spider-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.game-spider-status {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px 18px;
+  color: #33544d;
+  font-size: 13.5px;
+}
+
+/* 数字跳动时盒子不跟着抽 */
+.game-spider-score,
+.game-spider-moves,
+.game-spider-timer,
+.game-spider-foundation {
+  color: #24504a;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 已收集的完整花色组：贴在控制行右侧空白区 */
+.game-spider-foundations {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.game-spider-foundations-card {
+  width: 28px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c9d6cd;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #1f3d38;
+  font-size: 19px;
+  line-height: 1;
+  box-shadow: 0 1px 2px rgba(31, 61, 56, 0.14);
+}
+
+.game-spider-foundations-card--red {
+  color: #b3392f;
+}
+
+@media (max-width: 720px) {
+  .game-spider-foundations {
+    gap: 4px;
+  }
+
+  .game-spider-foundations-card {
+    width: 24px;
+    height: 33px;
+    font-size: 16px;
+  }
+}
+
+.game-spider-notice {
+  flex: 0 0 auto;
+  padding: 7px 12px;
+  border: 1px solid #e4cfc9;
+  border-radius: 9px;
+  background: #fdf4f2;
+  color: #7d4a41;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/*
+ * 表盘：10 列等宽网格 + 容器查询。
+ * cqw 只出现在 --game-spider-card-w 这一行；表盘自身不消费这个变量
+ * （cqw 解析的是「最近的容器祖先」，用在表盘自己身上会退化成视口宽）。
+ */
+.game-spider-tableau {
+  --game-spider-card-gap: 6px;
+  --game-spider-card-w: calc((100cqw - 9 * var(--game-spider-card-gap)) / 10);
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  column-gap: var(--game-spider-card-gap);
+  /* 兜底：容器查询不被支持时，影子层也要有个包含块 */
+  position: relative;
+  container-type: inline-size;
+  /*
+   * pan-y + pinch-zoom：保留表盘区的纵向平移与双指缩放（页面本身允许缩放），
+   * 横向手势留给拖拽。判定为纵向时浏览器会派发 pointercancel，组件据此 abort。
+   */
+  touch-action: pan-y pinch-zoom;
+}
+
+/*
+ * 单列只占内容高。默认 align-self: stretch 会把 10 列拉成同高（= 最高列），
+ * 那样「6 张列高 − 5 张列高」恒为 0，验收判据会失去区分度。
+ */
+.game-spider-col {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+}
+
+/* 空列占位：虚线框。有牌时不会出现这个类。 */
+.game-spider-col--empty {
+  min-height: calc(var(--game-spider-card-w) * 1.4);
+  border: 1px dashed #cfe0d7;
+  border-radius: 5px;
+}
+
+.game-spider-card {
+  aspect-ratio: 5 / 7;
+  /* 不能被 flex 压缩：压扁了负边距的叠放关系就全乱了 */
+  flex: none;
+  /* 角标的定位祖先 */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 1px;
+  overflow: hidden;
+  border: 1px solid #cfded6;
+  border-radius: 5px;
+  background: #ffffff;
+  color: #24504a;
+  line-height: 1;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/*
+ * 卡面三件套：左上点数 / 右上花色 / 中间大花色。
+ * 字号都从卡尺派生（系数 × 卡宽，clamp 兜上下限），视口之间不需要分别适配；
+ * 角标必须整个落在正面露出条（卡面顶部 37.9%）里 —— top 2px + 字号上限 18px
+ * 在桌面 140px 卡高下最多探到 20px，条高 53px，余量充足。
+ * 背面牌的 color: transparent 连子元素一起隐掉，无需另写规则。
+ */
+.game-spider-rank,
+.game-spider-suit {
+  position: absolute;
+  top: 2px;
+  font-size: clamp(7px, calc(var(--game-spider-card-w) * 0.18), 18px);
+  font-weight: 600;
+}
+
+.game-spider-rank {
+  left: 4px;
+}
+
+.game-spider-suit {
+  right: 4px;
+}
+
+.game-spider-pip {
+  font-size: clamp(9px, calc(var(--game-spider-card-w) * 0.30), 30px);
+  font-weight: 600;
+}
+
+/*
+ * 叠放：负边距的百分比按包含块（= .game-spider-col 的内容盒）的**行内尺寸**解析
+ * （CSS 2.1 §8.3），而列宽就等于卡宽 → 天然以卡宽为单位，不需要 cqw、不需要
+ * max()、也不需要分档写死。前提是列不得有水平 padding / border（硬约束 3）。
+ *
+ * 前缀 `+ .game-spider-card` 有两个作用：每列首张不加负边距；影子堆的首张也不
+ * 受影响（影子内全是正面牌，走 --up 那条）。
+ */
+.game-spider-card + .game-spider-card--down {
+  margin-top: -112%; /* 背面露出 28% 卡宽 */
+}
+
+.game-spider-card + .game-spider-card--up {
+  margin-top: -87%; /* 正面露出 53% 卡宽 */
+}
+
+.game-spider-card--down {
+  border-color: #b9d2c6;
+  background: repeating-linear-gradient(45deg, #dcebe2 0 4px, #cbe1d5 4px 8px);
+  color: transparent;
+}
+
+.game-spider-card--red {
+  color: #c0392b;
+}
+
+/* 被拖走的牌留在原位占空格：可见性隐藏，但位置还在 */
+.game-spider-card--dragging {
+  visibility: hidden;
+}
+
+/*
+ * 影子层：不参与网格（绝对定位不吃轨道），内部也不用网格，
+ * 影子宽度直接读卡尺变量 —— 与列轨道读的是同一个变量，等宽不靠巧合。
+ */
+.game-spider-drag-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.game-spider-drag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  width: var(--game-spider-card-w);
+  filter: drop-shadow(0 10px 18px rgba(16, 44, 44, 0.26));
+}
+
+/* 全局 button 只重置了 border，background / border-radius / padding 得自己写 */
+.game-spider-stock {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid #cfded6;
+  border-radius: 9px;
+  background: #f2f7f3;
+  color: #2f6d64;
+  font-size: 13.5px;
+}
+
+.game-spider-stock:hover:not(:disabled) {
+  background: #e8f1ea;
+}
+
+.game-spider-stock--empty {
+  opacity: 0.5;
+}
+
+/* ===== 基础段结束 ===== */
+
+/* ===== @supports 回退段：整段追加时紧跟在基础段之后 ===== */
+
+/*
+ * 不支持容器查询单位的浏览器里，calc(100cqw …) 在 computed-value 阶段无效，
+ * 变量落到 guaranteed-invalid，影子宽度会退化成 shrink-to-fit。所以这一段
+ * 是必需的，不是装饰。三档各自按所在断点的 gap 反算，gap 基础值是 px、旧
+ * 浏览器同样有效，不需要在这里重复。
+ */
+@supports not (width: 1cqw) {
+  .game-spider-tableau {
+    --game-spider-card-w: 100px;
+  }
+
+  @media (max-width: 800px) {
+    .game-spider-tableau {
+      --game-spider-card-w: 65px;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .game-spider-tableau {
+      --game-spider-card-w: 26px;
+    }
+  }
+}
+
+/* ===== @supports 回退段结束 ===== */
+
+/* ===== @media 720 段：整段追加时排在回退段之后 ===== */
+
+/*
+ * 卡尺、字号、露出条全都随容器缩放，所以这里只剩一件事：收窄列间距。
+ * gap 一变，卡宽公式与网格 column-gap 同时变（读的是同一个变量）。
+ */
+@media (max-width: 720px) {
+  .game-spider-tableau {
+    --game-spider-card-gap: 3px;
+  }
+
+  .game-spider-status {
+    flex-wrap: wrap;
+  }
+}
+
+/* ===== @media 720 段结束 ===== */
+
+/* ===== 暗色段：整段追加时排在最后 ===== */
+
+html.mh-theme-dark .game-spider-status {
+  color: #9fb3ab;
+}
+
+html.mh-theme-dark .game-spider-score,
+html.mh-theme-dark .game-spider-moves,
+html.mh-theme-dark .game-spider-timer,
+html.mh-theme-dark .game-spider-foundation {
+  color: #cfe0d8;
+}
+
+html.mh-theme-dark .game-spider-notice {
+  border-color: #7a3a34;
+  background: #3a2523;
+  color: #ff9b8f;
+}
+
+html.mh-theme-dark .game-spider-col--empty {
+  border-color: #313b41;
+}
+
+html.mh-theme-dark .game-spider-card {
+  border-color: #313b41;
+  background: #262f33;
+  color: #cfe0d8;
+}
+
+html.mh-theme-dark .game-spider-card--down {
+  border-color: #283236;
+  background: repeating-linear-gradient(45deg, #2a363b 0 4px, #222c30 4px 8px);
+}
+
+html.mh-theme-dark .game-spider-card--up {
+  border-color: #3a464b;
+  background: #2d383c;
+}
+
+html.mh-theme-dark .game-spider-card--red {
+  color: #ff8b7d;
+}
+
+html.mh-theme-dark .game-spider-card--dragging {
+  background: #1a2225;
+}
+
+html.mh-theme-dark .game-spider-drag {
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.45));
+}
+
+html.mh-theme-dark .game-spider-stock {
+  border-color: #313b41;
+  background: #1c2428;
+  color: #cfe0d8;
+}
+
+html.mh-theme-dark .game-spider-stock:hover:not(:disabled) {
+  background: #24302f;
+}
+
+html.mh-theme-dark .game-spider-stock--empty {
+  opacity: 0.45;
+}
+
+html.mh-theme-dark .game-spider-foundations-card {
+  border-color: #3d5a53;
+  background: #26312f;
+  color: #cfe0d8;
+  box-shadow: none;
+}
+
+html.mh-theme-dark .game-spider-foundations-card--red {
+  color: #ff8b7d;
+}
+
+/* ===== 暗色段结束 ===== */

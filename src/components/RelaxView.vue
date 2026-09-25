@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 import * as echarts from 'echarts';
 import {
+  Bomb,
   CircleDot,
   Gamepad2,
   Gauge,
@@ -10,6 +11,7 @@ import {
   Palette,
   Pause,
   Play,
+  Spade,
   Square,
   Wind,
 } from 'lucide-vue-next';
@@ -19,6 +21,8 @@ import BubblePopGame from './BubblePopGame.vue';
 import ColorRelaxGame from './ColorRelaxGame.vue';
 import GameModal from './GameModal.vue';
 import MemoryMatchGame from './MemoryMatchGame.vue';
+import MineSweeperGame from './MineSweeperGame.vue';
+import SpiderSolitaireGame from './SpiderSolitaireGame.vue';
 
 const props = defineProps({
   section: { type: String, default: 'breathe' },
@@ -70,6 +74,24 @@ const GAMES = [
     description: '用低饱和的颜色涂满线稿。不必好看，也没有对错。',
     component: ColorRelaxGame,
     icon: Palette,
+  },
+  {
+    id: 'mine-sweeper',
+    name: '扫雷',
+    tagline: '推理',
+    description: '翻开格子、避开地雷，靠数字推理出每一颗雷的位置。踩雷不算失败，点笑脸重开一局。',
+    component: MineSweeperGame,
+    icon: Bomb,
+  },
+  {
+    id: 'spider-solitaire',
+    name: '蜘蛛纸牌',
+    tagline: '耐心',
+    description: '把同花色的牌从 K 到 A 排成整叠。难度从单花色到四花色，随时可以撤销。',
+    component: SpiderSolitaireGame,
+    icon: Spade,
+    /* 10 列牌桌要尽量大的牌面：弹窗收窄外边距（见 games.css 的 --wide 段） */
+    wide: true,
   },
 ];
 

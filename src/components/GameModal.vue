@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { LogOut } from 'lucide-vue-next';
 import { lockBackground, releaseBackground, watchBackgroundLock } from '../utils/backgroundLock';
 import { clearColorDraft, gameDraft } from '../utils/gameDraft';
@@ -16,17 +16,40 @@ const ROOT_SELECTOR = '.game-backdrop';
 /** 只有涂色会产生需要确认才丢弃的内容。 */
 const COLOR_GAME_ID = 'color-relax';
 
+/** 扫雷 / 蜘蛛开局后，进度会随退出丢掉 —— 组件用 dirty 事件上报是否进行中。 */
+const PROGRESS_COPY = {
+  'mine-sweeper': '这一局还没结束，退出会丢掉当前进度，确定离开吗？',
+  'spider-solitaire': '这一局还没结束，退出会丢掉当前进度，确定离开吗？',
+};
+
 const confirmingExit = ref(false);
+
+/** 最近一次 dirty 事件的值；涂色不走这条线（它看 gameDraft.hasStrokes）。 */
+const gameDirty = ref(false);
 
 /** 打开弹窗前的焦点持有者，关闭时按 WAI-ARIA APG 归还给它。 */
 let opener = null;
 
+const confirmText = computed(() =>
+  props.game.id === COLOR_GAME_ID ? '这次涂色不会保存，确定离开吗？' : PROGRESS_COPY[props.game.id] || '',
+);
+
+const stayLabel = computed(() => (props.game.id === COLOR_GAME_ID ? '继续涂色' : '继续游戏'));
+
+function onDirty(value) {
+  gameDirty.value = Boolean(value);
+}
+
 /**
  * 退出的唯一入口。遮罩刻意不绑 click.self —— 点旁边的空白处不关闭。
- * 涂色已经落过笔时先问一句，避免辛苦涂的画被一次误点清掉。
+ * 涂色已经落过笔、或扫雷 / 蜘蛛这一局还没结束，都先问一句再放行。
  */
 function requestExit() {
   if (props.game.id === COLOR_GAME_ID && gameDraft.hasStrokes) {
+    confirmingExit.value = true;
+    return;
+  }
+  if (gameDirty.value && confirmText.value) {
     confirmingExit.value = true;
     return;
   }
@@ -76,7 +99,7 @@ onBeforeUnmount(() => {
 
 <template>
   <Teleport to="body">
-    <div class="modal-backdrop game-backdrop">
+    <div class="modal-backdrop game-backdrop" :class="{ 'game-backdrop--wide': game.wide }">
       <section
         class="game-modal"
         role="dialog"
@@ -100,13 +123,13 @@ onBeforeUnmount(() => {
         </header>
 
         <div class="game-stage">
-          <component :is="game.component" />
+          <component :is="game.component" @dirty="onDirty" />
         </div>
 
         <div v-if="confirmingExit" class="game-confirm" role="alertdialog" aria-live="polite">
-          <p>这次涂色不会保存，确定离开吗？</p>
+          <p>{{ confirmText }}</p>
           <div class="game-confirm-actions">
-            <button class="secondary" type="button" @click="cancelExit">继续涂色</button>
+            <button class="secondary" type="button" @click="cancelExit">{{ stayLabel }}</button>
             <button class="danger-button" type="button" @click="confirmExit">确定离开</button>
           </div>
         </div>
