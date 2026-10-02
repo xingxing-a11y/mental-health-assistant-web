@@ -1,0 +1,32 @@
+# ==========================================================================
+# 文本 / 二进制判定与行尾规则
+# --------------------------------------------------------------------------
+# 与 assistant-backend 保持同一套约定：仓库与工作区都用 LF。
+#
+# 背景：本机 git 开着 core.autocrlf=true，而工作区历史上是 CRLF/LF 混杂，
+#       其中 src/style.css 曾是「\r\r\n」（双回车）的异常状态。
+#       本文件把行尾固定为 LF，使任何机器、任何 core.autocrlf 设置下结果一致。
+#
+# 注意：src/style.css 已从 CRCRLF 规范为 LF，本次规范化会在 git 中体现为
+#       一次「只改行尾」的提交，内容（CSS 规则）一字未变。
+# ==========================================================================
+
+# 默认：自动识别文本文件，统一使用 LF 行尾
+* text=auto eol=lf
+
+# 二进制文件：任何情况下都不做行尾转换
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.svg    text eol=lf
+*.ttf    binary
+*.otf    binary
+*.woff   binary
+*.woff2  binary
+*.jar    binary
+*.zip    binary
+*.pdf    binary
+*.docx   binary
+*.xlsx   binary
