@@ -15,6 +15,7 @@ import SettingsView from './components/SettingsView.vue';
 import LoginView from './components/LoginView.vue';
 import AdminView from './components/AdminView.vue';
 import DiaryView from './components/DiaryView.vue';
+import { apiUrl } from './api/client';
 import {
   announcementApi,
   articleApi,
@@ -1292,7 +1293,7 @@ onBeforeUnmount(() => {
               <img
                 v-if="profile.avatarUrl"
                 class="avatar profile-avatar-image"
-                :src="`/api/v1${profile.avatarUrl}`"
+                :src="apiUrl(profile.avatarUrl)"
                 alt="用户头像"
               />
               <span v-else class="avatar">{{ profile.nickname?.slice(0, 1) || 'U' }}</span>

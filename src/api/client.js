@@ -1,5 +1,10 @@
 const API_PREFIX = '/api/v1';
 
+/** 拼接后端接口的完整路径：服务前缀只在本文件出现一次，其余模块一律经它拼接。 */
+export function apiUrl(path) {
+  return `${API_PREFIX}${path}`;
+}
+
 export async function request(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set('Accept', 'application/json');
@@ -12,7 +17,7 @@ export async function request(path, options = {}) {
 
   let response;
   try {
-    response = await fetch(`${API_PREFIX}${path}`, {
+    response = await fetch(apiUrl(path), {
       ...options,
       headers,
       credentials: 'include',
@@ -47,7 +52,7 @@ export async function request(path, options = {}) {
 export async function downloadFile(path) {
   let response;
   try {
-    response = await fetch(`${API_PREFIX}${path}`, {
+    response = await fetch(apiUrl(path), {
       method: 'GET',
       headers: { Accept: '*/*' },
       credentials: 'include',

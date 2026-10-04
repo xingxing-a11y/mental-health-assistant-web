@@ -1,4 +1,4 @@
-import { get, post, put, remove, request, downloadFile } from './client';
+import { apiUrl, get, post, put, remove, request, downloadFile } from './client';
 
 /** 把可选参数拼成查询串，空值不参与拼接。 */
 export function buildQuery(params = {}) {
@@ -170,7 +170,7 @@ export const announcementApi = {
 };
 
 export async function streamChat(sessionId, content, onEvent) {
-  const response = await fetch(`/api/v1/chat/sessions/${sessionId}/messages`, {
+  const response = await fetch(apiUrl(`/chat/sessions/${sessionId}/messages`), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

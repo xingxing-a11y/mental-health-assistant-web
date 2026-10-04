@@ -1,5 +1,6 @@
 <script setup>
 import { reactive, ref, watch } from 'vue';
+import { apiUrl } from '../api/client';
 
 const props = defineProps({
   profile: { type: Object, default: null },
@@ -38,7 +39,7 @@ function avatarSource(url) {
   if (!url) {
     return '';
   }
-  return `/api/v1${url}`;
+  return apiUrl(url);
 }
 
 function chooseAvatar() {
