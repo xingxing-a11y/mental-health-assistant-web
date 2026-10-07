@@ -1,0 +1,83 @@
+name: CI/CD · web
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: web-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: 构建静态资源
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: npm ci（严格按 lock 安装）
+        run: npm ci --no-audit --no-fund
+
+      - name: vite build
+        run: npm run build
+
+      - name: 收集部署产物
+        run: |
+          mkdir -p deploy
+          cp -r dist deploy/dist
+          cp nginx.conf deploy/nginx.conf
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-deploy
+          path: deploy/
+          retention-days: 7
+
+  deploy:
+    name: 部署到阿里云
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-deploy
+          path: deploy
+
+      - name: 准备 SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SERVER_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: rsync 静态资源（--delete 清掉旧 hash 文件）
+        run: |
+          SSHV="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes"
+          rsync -avz --delete --no-perms -e "$SSHV" \
+            deploy/dist/ \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/opt/mindharbor/web/dist/"
+
+      # nginx.conf 单独传：绝不能和 dist 共用一条 --delete 命令，否则会删掉服务器上的 nginx.conf
+      - name: rsync nginx 配置
+        run: |
+          SSHV="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes"
+          rsync -avz --no-perms -e "$SSHV" \
+            deploy/nginx.conf \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/opt/mindharbor/nginx.conf"
+
+      - name: 让 nginx 重新加载配置
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o StrictHostKeyChecking=yes \
+            "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}" \
+            'set -e; cd /opt/mindharbor && (docker compose exec -T nginx nginx -s reload || docker compose restart nginx) && docker compose ps'
