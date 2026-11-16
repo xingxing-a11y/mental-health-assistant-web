@@ -64,7 +64,7 @@ jobs:
       - name: rsync 静态资源（--delete 清掉旧 hash 文件）
         run: |
           SSHV="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes"
-          rsync -avz --delete --no-perms -e "$SSHV" \
+          rsync -avz --delete --chmod=D755,F644 -e "$SSHV" \
             deploy/dist/ \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/opt/mindharbor/web/dist/"
 
@@ -72,7 +72,7 @@ jobs:
       - name: rsync nginx 配置
         run: |
           SSHV="ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes"
-          rsync -avz --no-perms -e "$SSHV" \
+          rsync -avz --chmod=D755,F644 -e "$SSHV" \
             deploy/nginx.conf \
             "${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:/opt/mindharbor/nginx.conf"
 
