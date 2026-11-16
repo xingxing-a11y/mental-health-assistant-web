@@ -1240,6 +1240,7 @@ onBeforeUnmount(() => {
             新增题目会直接套用这四个选项；已录入的单选题点右侧按钮一键覆盖。
           </p>
         </div>
+        <div class="question-list">
         <div v-if="!questionForm.length" class="empty-state question-empty">
           暂无题目，请点击“添加题目”。
         </div>
@@ -1306,6 +1307,7 @@ onBeforeUnmount(() => {
           </div>
           <p v-else class="question-type-hint">文字题由用户直接填写，不参与自动计分。</p>
         </article>
+        </div>
         <div class="management-actions">
           <button class="primary-button" type="button" @click="saveQuestions">保存题目</button>
           <button class="text-button" type="button" @click="cancelQuestions">取消</button>
