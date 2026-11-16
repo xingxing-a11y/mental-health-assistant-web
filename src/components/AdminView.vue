@@ -58,7 +58,10 @@ async function ensureArticleEditor() {
   if (articleEditor || !articleEditorRef.value) {
     return;
   }
-  const { createEditor, createToolbar } = await import('@wangeditor/editor');
+  const [{ createEditor, createToolbar }, { marked }] = await Promise.all([
+    import('@wangeditor/editor'),
+    import('marked'),
+  ]);
   const editorConfig = {
     placeholder: '文章正文，支持标题、加粗、字号、列表',
     // 正文没有图片/视频上传通道，留着按钮只会点了报错
@@ -69,9 +72,21 @@ async function ensureArticleEditor() {
      */
     customPaste(editor, event, callback) {
       const clipboard = event.clipboardData;
-      const html = clipboard ? clipboard.getData('text/html') || '' : '';
+      if (!clipboard) {
+        callback(true);
+        return true;
+      }
+      const html = clipboard.getData('text/html') || '';
+      const text = clipboard.getData('text/plain') || '';
       if (/<img\b/i.test(html)) {
         setError('正文不支持粘贴图片，请只粘贴文字内容');
+        callback(false);
+        return false;
+      }
+      // 纯文本且带明显 markdown 语法时直接解析插入；误判可以 Ctrl+Z 撤回
+      if (!html && text && looksLikeMarkdown(text)) {
+        const converted = marked.parse(text).replace(/<script[\s\S]*?<\/script>/gi, '');
+        editor.dangerouslyInsertHtml(converted);
         callback(false);
         return false;
       }
@@ -112,6 +127,20 @@ function syncArticleEditor(content) {
   if (articleEditor) {
     articleEditor.setHtml(content || '<p><br></p>');
   }
+}
+
+/**
+ * 判断粘贴进来的纯文本是否像 markdown。
+ * 只认块级语法和双星强调；单星号（*斜体*）刻意不认——
+ * 「价格是 *重要* 的」这种句子太常见，认了会满篇变斜体。
+ */
+function looksLikeMarkdown(text) {
+  return /^#{1,6}\s+\S/m.test(text)
+    || /\*\*[^*\n]+\*\*/.test(text)
+    || /^```/m.test(text)
+    || /^\s*[-*+]\s+\S/m.test(text)
+    || /^\s*\d+[.)]\s+\S/m.test(text)
+    || /^\s*>\s+\S/m.test(text);
 }
 
 watch(
