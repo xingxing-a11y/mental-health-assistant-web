@@ -63,6 +63,21 @@ async function ensureArticleEditor() {
     placeholder: '文章正文，支持标题、加粗、字号、列表',
     // 正文没有图片/视频上传通道，留着按钮只会点了报错
     excludeKeys: ['group-image', 'group-video'],
+    /**
+     * 粘贴带图片的内容会被编辑器转成 base64 塞进正文，而后端白名单会剥掉 img，
+     * 结果就是「当场看着粘上了、保存后图片消失」。这里直接拦下并说明原因。
+     */
+    customPaste(editor, event, callback) {
+      const clipboard = event.clipboardData;
+      const html = clipboard ? clipboard.getData('text/html') || '' : '';
+      if (/<img\b/i.test(html)) {
+        setError('正文不支持粘贴图片，请只粘贴文字内容');
+        callback(false);
+        return false;
+      }
+      callback(true);
+      return true;
+    },
     MENU_CONF: {},
   };
   articleEditor = createEditor({
