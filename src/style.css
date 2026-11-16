@@ -5158,3 +5158,23 @@ html.mh-theme-dark .meditation-card.playing {
 html.mh-theme-dark .breath-circle.active {
   background: #243a36;
 }
+
+/* 右上角用户区：顶栏底色 #0e1618，这块原来是透明底 + 近黑文字，整个"消失"在顶栏里。
+   给它独立的浅一档底色和描边，让人一眼找到；描边用 inset 阴影，避免改变按钮尺寸。 */
+html.mh-theme-dark .profile-trigger {
+  color: #e2eeea;
+  background: #1e2c2b;
+  box-shadow: inset 0 0 0 1px #2d4142;
+}
+
+html.mh-theme-dark .profile-trigger:hover,
+html.mh-theme-dark .profile-trigger[aria-expanded='true'] {
+  background: #26393a;
+  box-shadow: inset 0 0 0 1px #3d5556;
+}
+
+/* 头像徽章用品牌青绿做视觉锚点；绿底上的字必须是深色，白字对比度只有 3.5 */
+html.mh-theme-dark .avatar {
+  background: #2c9b78;
+  color: #0e1618;
+}
