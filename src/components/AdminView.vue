@@ -4,6 +4,7 @@ import * as echarts from 'echarts';
 import { formatDateTime } from '../utils/dateTime';
 import { adminApi, assessmentApi } from '../api/modules';
 import ConfirmDialog from './ConfirmDialog.vue';
+import '@wangeditor/editor/dist/css/style.css';
 
 const props = defineProps({
   section: { type: String, default: 'overview' },
@@ -46,6 +47,70 @@ const articleForm = ref({ title: '', summary: '', content: '' });
 const editingArticleId = ref(null);
 const expandedEditorTarget = ref(null);
 const pendingConfirm = ref(null);
+
+/* ---- 文章富文本编辑器（wangeditor，手动挂载，不额外引入 Vue 封装包） ---- */
+const articleEditorRef = ref(null);
+const articleToolbarRef = ref(null);
+let articleEditor = null;
+
+/** 只在文章管理分区出现时挂载编辑器；JS 走动态 import，避免首屏多背 500KB。 */
+async function ensureArticleEditor() {
+  if (articleEditor || !articleEditorRef.value) {
+    return;
+  }
+  const { createEditor, createToolbar } = await import('@wangeditor/editor');
+  const editorConfig = {
+    placeholder: '文章正文，支持标题、加粗、字号、列表',
+    // 正文没有图片/视频上传通道，留着按钮只会点了报错
+    excludeKeys: ['group-image', 'group-video'],
+    MENU_CONF: {},
+  };
+  articleEditor = createEditor({
+    selector: articleEditorRef.value,
+    html: articleForm.value.content || '<p><br></p>',
+    config: editorConfig,
+    mode: 'default',
+  });
+  if (articleToolbarRef.value) {
+    createToolbar({
+      editor: articleEditor,
+      selector: articleToolbarRef.value,
+      config: editorConfig,
+      mode: 'default',
+    });
+  }
+  // change 有防抖，保存时还会再主动取一次，避免丢掉最后几个字
+  articleEditor.on('change', () => {
+    articleForm.value.content = articleEditor.getHtml();
+  });
+}
+
+function destroyArticleEditor() {
+  if (articleEditor) {
+    articleEditor.destroy();
+    articleEditor = null;
+  }
+}
+
+/** 换文章或清空表单时，把内容同步进编辑器。 */
+function syncArticleEditor(content) {
+  if (articleEditor) {
+    articleEditor.setHtml(content || '<p><br></p>');
+  }
+}
+
+watch(
+  () => props.section,
+  async (section) => {
+    if (section === 'articles') {
+      await nextTick();
+      ensureArticleEditor();
+    } else {
+      destroyArticleEditor();
+    }
+  },
+  { immediate: true },
+);
 const confirmBusy = ref(false);
 let errorTimer = null;
 
@@ -377,11 +442,14 @@ function editArticle(article) {
     summary: article.summary || '',
     content: article.content || '',
   };
+  // 旧文章内容是纯文本，wangeditor 会原样显示为一段文字，保存后自然转成 HTML
+  syncArticleEditor(articleForm.value.content);
 }
 
 function cancelArticleEdit() {
   editingArticleId.value = null;
   articleForm.value = { title: '', summary: '', content: '' };
+  syncArticleEditor('');
 }
 
 function openExpandedEditor(target) {
@@ -656,7 +724,14 @@ async function runConfirmedAction() {
 }
 
 async function saveArticle() {
-  if (!articleForm.value.title.trim() || !articleForm.value.content.trim()) return;
+  // change 有防抖，提交前主动从编辑器取一次，避免最后几个字没同步到表单
+  if (articleEditor) {
+    articleForm.value.content = articleEditor.getHtml();
+  }
+  const contentEmpty = articleEditor
+    ? articleEditor.isEmpty()
+    : !articleForm.value.content.trim();
+  if (!articleForm.value.title.trim() || contentEmpty) return;
   const saved = editingArticleId.value
     ? await adminApi.updateArticle(editingArticleId.value, articleForm.value)
     : await adminApi.createArticle(articleForm.value);
@@ -668,6 +743,7 @@ async function saveArticle() {
   }
   articleForm.value = { title: '', summary: '', content: '' };
   editingArticleId.value = null;
+  syncArticleEditor('');
 }
 
 async function saveAnnouncement() {
@@ -1288,15 +1364,10 @@ onBeforeUnmount(() => {
       <form class="admin-form management-form" @submit.prevent="saveArticle">
         <input v-model="articleForm.title" maxlength="200" placeholder="文章标题" />
         <input v-model="articleForm.summary" maxlength="500" placeholder="文章摘要" />
-        <textarea
-          v-model="articleForm.content"
-          class="expandable-editor"
-          maxlength="200000"
-          rows="5"
-          placeholder="文章正文"
-          title="双击打开大窗口编辑"
-          @dblclick="openExpandedEditor('articleContent')"
-        />
+        <div class="article-editor-wrap">
+          <div ref="articleToolbarRef" class="article-editor-toolbar"></div>
+          <div ref="articleEditorRef" class="article-editor-body"></div>
+        </div>
         <div class="management-actions">
           <button class="primary-button" type="submit">{{ editingArticleId ? '保存文章' : '发布文章' }}</button>
           <button v-if="editingArticleId" class="text-button" type="button" @click="cancelArticleEdit">取消编辑</button>

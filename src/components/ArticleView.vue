@@ -8,6 +8,18 @@ defineProps({
 });
 
 const emit = defineEmits(['open', 'back', 'search']);
+
+/**
+ * 判断正文是富文本还是旧版纯文本。
+ * 含脚本类标签的一律按纯文本渲染——历史数据没有经过后端清洗，不能直接交给 v-html。
+ */
+function isRichContent(content) {
+  const text = content || '';
+  if (/<(script|iframe|object|embed|form|style)\b/i.test(text)) {
+    return false;
+  }
+  return /<\/?(p|h[1-6]|ul|ol|li|strong|em|u|s|blockquote|span|a|br|hr)\b/i.test(text);
+}
 </script>
 
 <template>
@@ -37,7 +49,12 @@ const emit = defineEmits(['open', 'back', 'search']);
         <time>{{ formatDateTime(selectedArticle.updatedAt) }}</time>
       </div>
       <h2>{{ selectedArticle.title }}</h2>
-      <p>{{ selectedArticle.content }}</p>
+      <div
+        v-if="isRichContent(selectedArticle.content)"
+        class="article-rich"
+        v-html="selectedArticle.content"
+      ></div>
+      <p v-else>{{ selectedArticle.content }}</p>
     </div>
     <div v-else class="article-list">
       <article v-for="(article, articleIndex) in articles" :key="article.id" class="article">

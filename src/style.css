@@ -5288,3 +5288,131 @@ html.mh-theme-dark .option-editor-details > summary {
 html.mh-theme-dark .option-editor-details > summary::before {
   color: #2c9b78;
 }
+
+/* ---- 后台文章富文本编辑区（wangeditor） ---- */
+.article-editor-wrap {
+  border: 1px solid #d4e1d9;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.article-editor-toolbar {
+  border-bottom: 1px solid #e6efe9;
+}
+
+.article-editor-body {
+  height: 320px;
+  overflow-y: auto;
+}
+
+/* ---- 前台文章正文富文本排版 ---- */
+.article-rich {
+  display: grid;
+  gap: 14px;
+  color: #38584d;
+  font-size: 15px;
+  line-height: 1.9;
+}
+
+.article-rich p {
+  margin: 0;
+}
+
+.article-rich h2,
+.article-rich h3,
+.article-rich h4 {
+  margin: 6px 0 0;
+  color: #285858;
+  line-height: 1.4;
+}
+
+.article-rich h2 {
+  font-size: 22px;
+}
+
+.article-rich h3 {
+  font-size: 18px;
+}
+
+.article-rich h4 {
+  font-size: 16px;
+}
+
+.article-rich ul,
+.article-rich ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.article-rich blockquote {
+  margin: 0;
+  padding: 10px 16px;
+  border-left: 3px solid #dba95d;
+  border-radius: 0 6px 6px 0;
+  background: #fbf7ed;
+  color: #59766c;
+}
+
+.article-rich a {
+  color: #2f6b58;
+  text-decoration: underline;
+}
+
+.article-rich hr {
+  border: none;
+  border-top: 1px dashed #dfe8e2;
+}
+
+/* ---- 暗色：编辑器与富文本 ----
+   wangeditor 靠一组 CSS 变量上色，在容器上重定义即可让它整体跟随主题 */
+html.mh-theme-dark .article-editor-wrap {
+  background: #192627;
+  border-color: #2d4142;
+  --w-e-textarea-bg-color: #192627;
+  --w-e-textarea-color: #e2eeea;
+  --w-e-textarea-border-color: #2d4142;
+  --w-e-textarea-slight-bg-color: #1e2c2b;
+  --w-e-textarea-slight-color: #9db2ad;
+  --w-e-textarea-slight-border-color: #2d4142;
+  --w-e-textarea-selected-border-color: #2c9b78;
+  --w-e-textarea-handler-bg-color: #2c9b78;
+  --w-e-toolbar-bg-color: #1e2c2b;
+  --w-e-toolbar-color: #e2eeea;
+  --w-e-toolbar-border-color: #2d4142;
+  --w-e-toolbar-active-bg-color: #26393a;
+  --w-e-toolbar-active-color: #7fd4b4;
+  --w-e-toolbar-disabled-color: #5b6b68;
+  --w-e-modal-button-bg-color: #1e2c2b;
+  --w-e-modal-button-border-color: #2d4142;
+}
+
+html.mh-theme-dark .article-editor-toolbar {
+  border-bottom-color: #2d4142;
+}
+
+html.mh-theme-dark .article-rich {
+  color: #c9dcd5;
+}
+
+html.mh-theme-dark .article-rich h2,
+html.mh-theme-dark .article-rich h3,
+html.mh-theme-dark .article-rich h4 {
+  color: #eff8f4;
+}
+
+html.mh-theme-dark .article-rich blockquote {
+  background: #2a2418;
+  border-left-color: #dba95d;
+  color: #b8cbc4;
+}
+
+html.mh-theme-dark .article-rich a {
+  color: #7fd4b4;
+}
+
+html.mh-theme-dark .article-rich hr {
+  border-top-color: #2d4142;
+}
