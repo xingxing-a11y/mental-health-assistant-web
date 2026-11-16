@@ -2614,7 +2614,7 @@ main.settings-layout > header {
   gap: 14px;
   padding: 18px 20px;
   border: 1px solid #e6efe9;
-  border-left: 4px solid #dba95d;
+  border-left: 4px solid #2f7d63;
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 2px 8px rgba(40, 88, 88, 0.06);
@@ -4951,7 +4951,8 @@ html.mh-theme-dark .question-list {
 html.mh-theme-dark .question-editor {
   background: #1e2c2b;
   border-color: #2d4142;
-  border-left-color: #dba95d;
+  /* 深绿 #2f7d63 在深色卡片上明度太接近会糊掉，暗色下换亮绿 */
+  border-left-color: #2c9b78;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
