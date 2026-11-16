@@ -4388,8 +4388,8 @@ html.mh-font-large {
 }
 
 html.mh-theme-dark {
-  background: #0c1012;
-  color: #ecf1ef;
+  background: #0e1618;
+  color: #e2eeea;
   /* 滚动条：UA 默认滚动条跟随亮色 color-scheme，渲染成近白的整条竖柱（实测 15 列 rgb(252,252,252)），
      压在近黑底上最刺眼。color-scheme 让 UA 派生深色滚动条，兼作老浏览器兜底；
      scrollbar-color 再用「半透明白拇指 + 透明轨道」上色，不绑定具体配色，换配色方案也成立。
@@ -4399,22 +4399,22 @@ html.mh-theme-dark {
 }
 
 html.mh-theme-dark body {
-  background: #0c1012;
-  color: #ecf1ef;
+  background: #0e1618;
+  color: #e2eeea;
 }
 
 html.mh-theme-dark main {
-  background: #0c1012;
+  background: #0e1618;
 }
 
 html.mh-theme-dark .app-header {
-  border-bottom-color: #313b41;
-  background: #0c1012;
+  border-bottom-color: #2d4142;
+  background: #0e1618;
 }
 
 html.mh-theme-dark .notification-trigger:hover,
 html.mh-theme-dark .notification-trigger[aria-expanded='true'] {
-  background: #2a363b;
+  background: #2a3c3d;
 }
 
 html.mh-theme-dark .profile-trigger {
@@ -4423,14 +4423,14 @@ html.mh-theme-dark .profile-trigger {
 
 html.mh-theme-dark .profile-trigger:hover,
 html.mh-theme-dark .profile-trigger[aria-expanded='true'] {
-  background: #2a363b;
+  background: #2a3c3d;
 }
 
 html.mh-theme-dark h1,
 html.mh-theme-dark h2,
 html.mh-theme-dark h3,
 html.mh-theme-dark h4 {
-  color: #f5f9f7;
+  color: #eff8f4;
 }
 
 html.mh-theme-dark .scale-card,
@@ -4473,63 +4473,63 @@ html.mh-theme-dark .favorite-toggle-list li,
 html.mh-theme-dark .comparison-list li,
 html.mh-theme-dark .favorites-modal,
 html.mh-theme-dark .log-row {
-  background: #161b1e;
-  border-color: #313b41;
-  color: #ecf1ef;
+  background: #192627;
+  border-color: #2d4142;
+  color: #e2eeea;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
 /* 收藏条目比弹窗底亮一档，并保住金色左描边，否则在暗色下与弹窗糊成一片 */
 html.mh-theme-dark .favorite-item {
-  background: #212a2e;
-  border-left-color: #e8bf76;
-  color: #ecf1ef;
+  background: #223032;
+  border-left-color: #e3bd7d;
+  color: #e2eeea;
 }
 
 html.mh-theme-dark .session-panel {
-  background: #161b1e;
+  background: #192627;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
 html.mh-theme-dark .session-close {
-  background: #212a2e;
-  color: #a2abaa;
+  background: #223032;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .chat-panel {
-  background: #161b1e;
+  background: #192627;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
 }
 
 /* 对话卡片上的引导条：与卡片同色会消失，比卡片浅一档 */
 html.mh-theme-dark .chat-intro {
-  background: #212a2e;
+  background: #223032;
 }
 
 html.mh-theme-dark .session-panel .panel-head {
-  background: #161b1e;
+  background: #192627;
 }
 
 /* 拖动条：亮色 #dfe8e2 在深色留白里过于刺眼，回落一档 */
 html.mh-theme-dark .chat-divider {
-  background: #313b41;
+  background: #2d4142;
 }
 
 html.mh-theme-dark .session-row {
-  border-bottom-color: #313b41;
+  border-bottom-color: #2d4142;
 }
 
 html.mh-theme-dark .admin-row {
-  background: #161b1e;
-  border-bottom-color: #313b41;
+  background: #192627;
+  border-bottom-color: #2d4142;
 }
 
 html.mh-theme-dark .user-table-scroll .user-row-head {
-  background: #161b1e;
+  background: #192627;
 }
 
 html.mh-theme-dark .user-table-scroll .user-row-head::after {
-  background: #0c1012;
+  background: #0e1618;
 }
 
 /* .user-table-scroll 自带 8px 的 ::-webkit-scrollbar 规则。上面继承下来的 scrollbar-color
@@ -4539,17 +4539,17 @@ html.mh-theme-dark .user-table-scroll {
 }
 
 html.mh-theme-dark .user-table-scroll::-webkit-scrollbar-thumb {
-  background: #47545b;
+  background: #3d5556;
 }
 
 html.mh-theme-dark .profile-form {
-  background: #161b1e;
-  border-color: #313b41;
+  background: #192627;
+  border-color: #2d4142;
 }
 
 html.mh-theme-dark .log-row-head {
-  background: #212a2e;
-  color: #a2abaa;
+  background: #223032;
+  color: #9db2ad;
 }
 
 /* 卡片式下字段名是 ::before 生成的，暗色要单独镜像。
@@ -4557,7 +4557,7 @@ html.mh-theme-dark .log-row-head {
 html.mh-theme-dark .admin-row > span:not(.management-count)::before,
 html.mh-theme-dark .log-row > span::before,
 html.mh-theme-dark .log-row > time::before {
-  color: #a2abaa;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .management-item-copy strong,
@@ -4582,7 +4582,7 @@ html.mh-theme-dark .settings-about h3,
 html.mh-theme-dark .settings-about h4,
 html.mh-theme-dark .favorite-message-list li p,
 html.mh-theme-dark .favorite-toggle-list li span {
-  color: #ecf1ef;
+  color: #e2eeea;
 }
 
 html.mh-theme-dark .management-item-copy p,
@@ -4605,56 +4605,57 @@ html.mh-theme-dark .helper,
 html.mh-theme-dark .composer-note,
 html.mh-theme-dark .empty-state,
 html.mh-theme-dark .loading-state {
-  color: #a2abaa;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .bubble {
-  background: #212a2e;
-  border-color: #313b41;
-  color: #ecf1ef;
+  background: #223032;
+  border-color: #2d4142;
+  color: #e2eeea;
 }
 
 html.mh-theme-dark .message.user .bubble {
-  background: #14795c;
+  background: #2c9b78;
   color: #f4fbf9;
 }
 
 html.mh-theme-dark input,
 html.mh-theme-dark textarea,
 html.mh-theme-dark select {
-  background: #11161a;
-  border-color: #313b41;
-  color: #ecf1ef;
+  background: #15201f;
+  border-color: #354c4d;
+  color: #e2eeea;
+  color-scheme: dark;
 }
 
 html.mh-theme-dark .composer {
-  background: #161b1e;
-  border-color: #313b41;
+  background: #192627;
+  border-color: #2d4142;
 }
 
 html.mh-theme-dark .notification-tabs button,
 html.mh-theme-dark .settings-tabs button,
 html.mh-theme-dark .secondary {
-  border-color: #47545b;
-  color: #a2abaa;
+  border-color: #3d5556;
+  color: #9db2ad;
 }
 
 /* 暗色按钮底色：镜像亮色的「一档底、hover 加深一档」 */
 html.mh-theme-dark .secondary {
-  background: #212a2e;
+  background: #223032;
 }
 
 html.mh-theme-dark .secondary:hover {
-  background: #2a363b;
+  background: #2a3c3d;
 }
 
 html.mh-theme-dark .text-button {
-  background: #212a2e;
+  background: #223032;
   color: #34b184;
 }
 
 html.mh-theme-dark .text-button:hover {
-  background: #2a363b;
+  background: #2a3c3d;
 }
 
 html.mh-theme-dark .favorites-toggle {
@@ -4663,7 +4664,7 @@ html.mh-theme-dark .favorites-toggle {
 
 html.mh-theme-dark .favorites-toggle:hover,
 html.mh-theme-dark .favorites-toggle[aria-expanded='true'] {
-  background: #2a363b;
+  background: #2a3c3d;
 }
 
 html.mh-theme-dark .danger-button {
@@ -4676,18 +4677,18 @@ html.mh-theme-dark .danger-button:hover {
 }
 
 html.mh-theme-dark .icon {
-  background: #212a2e;
-  color: #a2abaa;
+  background: #223032;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .icon:hover {
-  background: #2a363b;
+  background: #2a3c3d;
 }
 
 html.mh-theme-dark .notification-tabs button.active,
 html.mh-theme-dark .settings-tabs button.active {
-  background: #14795c;
-  border-color: #14795c;
+  background: #2c9b78;
+  border-color: #2c9b78;
   color: #f4fbf9;
 }
 
@@ -4699,14 +4700,14 @@ html.mh-theme-dark .crisis-banner,
 html.mh-theme-dark .meditation-player {
   background: #332b19;
   border-color: #332b19;
-  color: #e8bf76;
+  color: #e3bd7d;
 }
 
 html.mh-theme-dark .crisis-banner p,
 html.mh-theme-dark .meditation-player h4,
 html.mh-theme-dark .meditation-player p,
 html.mh-theme-dark .meditation-player small {
-  color: #e8bf76;
+  color: #e3bd7d;
 }
 
 /* ===== 三期：设置保存反馈 ===== */
@@ -4738,7 +4739,7 @@ html.mh-theme-dark .meditation-player small {
 
 html.mh-theme-dark .settings-save-hint {
   background: #16302a;
-  color: #a2abaa;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .settings-save-hint.error {
@@ -4747,109 +4748,120 @@ html.mh-theme-dark .settings-save-hint.error {
 }
 
 html.mh-theme-dark .settings-fixed {
-  border-color: #313b41;
+  border-color: #2d4142;
 }
 html.mh-theme-dark .scale-view-modal {
   background:
     linear-gradient(180deg, rgba(20, 121, 92, 0.22) 0%, rgba(20, 121, 92, 0) 150px),
-    #161b1e;
-  border-color: #47545b;
+    #192627;
+  border-color: #3d5556;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
 html.mh-theme-dark .scale-view-head {
-  border-bottom-color: #47545b;
+  border-bottom-color: #3d5556;
 }
 
 html.mh-theme-dark .scale-view-head h2 {
-  color: #a2abaa;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .scale-view-dot {
-  color: #e8bf76;
+  color: #e3bd7d;
 }
 
 html.mh-theme-dark .scale-view-close {
-  border-color: #47545b;
-  color: #a2abaa;
+  border-color: #3d5556;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .scale-view-close:hover {
-  border-color: #47545b;
-  background: #212a2e;
-  color: #a2abaa;
+  border-color: #3d5556;
+  background: #223032;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .scale-view-description {
-  border-left-color: #e8bf76;
-  background: #212a2e;
-  color: #a2abaa;
+  border-left-color: #e3bd7d;
+  background: #223032;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .scale-view-question {
-  border-color: #47545b;
-  background: #212a2e;
+  border-color: #3d5556;
+  background: #223032;
   box-shadow: none;
 }
 
 html.mh-theme-dark .scale-view-question-title b {
   background: #332b19;
-  color: #e8bf76;
+  color: #e3bd7d;
 }
 
 html.mh-theme-dark .scale-view-question-text span {
-  color: #a2abaa;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .scale-view-question-text em {
-  background: #161b1e;
-  color: #a2abaa;
+  background: #192627;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .scale-view-options li {
-  border-bottom-color: #47545b;
-  color: #a2abaa;
+  border-bottom-color: #3d5556;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .scale-view-options li::before {
-  border-color: #47545b;
+  border-color: #3d5556;
 }
 
 html.mh-theme-dark .scale-view-options small {
   background: #332b19;
-  color: #e8bf76;
+  color: #e3bd7d;
 }
 
 html.mh-theme-dark .scale-view-matrix {
-  color: #7e8886;
+  color: #7d918c;
 }
 
 html.mh-theme-dark .scale-view-matrix-grid thead th,
 html.mh-theme-dark .scale-view-matrix-grid tbody tr + tr th,
 html.mh-theme-dark .scale-view-matrix-grid tbody tr + tr td {
-  border-color: #47545b;
+  border-color: #3d5556;
 }
 
 html.mh-theme-dark .scale-view-matrix-grid thead th {
-  color: #7e8886;
+  color: #7d918c;
 }
 
 html.mh-theme-dark .scale-view-matrix-grid tbody th {
-  color: #a2abaa;
+  color: #9db2ad;
 }
 
 html.mh-theme-dark .scale-view-matrix-dot {
-  border-color: #47545b;
+  border-color: #3d5556;
 }
 
 html.mh-theme-dark .question-form-heading {
-  background: #161b1e;
-  border-bottom-color: #313b41;
+  background: #192627;
+  border-bottom-color: #2d4142;
+}
+
+/* 题目卡片在暗色下需要自己的一层底色，否则只能靠亮色边框勾勒，嵌套没有层次 */
+html.mh-theme-dark .question-editor {
+  background: #1e2c2b;
+  border-color: #2d4142;
+}
+
+html.mh-theme-dark input::placeholder,
+html.mh-theme-dark textarea::placeholder {
+  color: #6f8480;
 }
 
 html.mh-theme-dark .scale-view-foot {
-  border-top-color: #47545b;
-  color: #7e8886;
+  border-top-color: #3d5556;
+  color: #7d918c;
 }
 
 html.mh-theme-dark .assessment-question-missing {
@@ -4874,11 +4886,66 @@ html.mh-theme-dark .assessment-missing-warning {
    焦点环用亮青，比 UA 默认环在深底上清楚得多。 */
 html.mh-theme-dark .session-panel,
 html.mh-theme-dark .chat-panel {
-  border: 1px solid #313b41;
+  border: 1px solid #2d4142;
   box-shadow: none;
 }
 
 html.mh-theme-dark :focus-visible {
   outline: 2px solid #34b184;
   outline-offset: 2px;
+}
+
+/* 亮色主题里的深绿标题色 #285858 特异性高于 html.mh-theme-dark h2/h3，
+   在深底上会退成看不清的暗块，这里按选择器逐个补齐 */
+html.mh-theme-dark .announcement-modal-head h2,
+html.mh-theme-dark .announcement-card h3,
+html.mh-theme-dark .announcement-detail-head h2,
+html.mh-theme-dark .archived-sessions-head h3,
+html.mh-theme-dark .archived-session-item strong,
+html.mh-theme-dark .article-detail h2,
+html.mh-theme-dark .report-heading h3,
+html.mh-theme-dark .profile-identity h2,
+html.mh-theme-dark .profile-form-heading h3,
+html.mh-theme-dark .confirm-modal h2,
+html.mh-theme-dark .editor-modal-head h2,
+html.mh-theme-dark .analysis-modal-head h2,
+html.mh-theme-dark .assessment-form-head h3,
+html.mh-theme-dark .assessment-history-head h3,
+html.mh-theme-dark .diary-search-results h4,
+html.mh-theme-dark .diary-modal-head h3,
+html.mh-theme-dark .question-editor-head,
+html.mh-theme-dark .diary-composer-head h3,
+html.mh-theme-dark .diary-section-head h3,
+html.mh-theme-dark .overview-chart-panel h3,
+html.mh-theme-dark .audit-panel h3,
+html.mh-theme-dark .favorites-modal-head h2 {
+  color: #eff8f4;
+}
+
+/* 非标题类深绿文字（大分数、纯文字按钮、菜单项）用品牌青绿，避免全白失去层次 */
+html.mh-theme-dark .report-score,
+html.mh-theme-dark .text-btn,
+html.mh-theme-dark .profile-menu button,
+html.mh-theme-dark .session-menu button {
+  color: #a8dcc6;
+}
+
+/* 金色文字（分数、题号、状态、危机热线）在深底上会退成土褐色，统一提亮 */
+html.mh-theme-dark .announcement-card-meta span,
+html.mh-theme-dark .settings-option-count,
+html.mh-theme-dark .archived-sessions-head > span,
+html.mh-theme-dark .session-pin,
+html.mh-theme-dark .notice,
+html.mh-theme-dark .scale-index,
+html.mh-theme-dark .article-number,
+html.mh-theme-dark .article-label,
+html.mh-theme-dark .assessment-ai-analysis h4,
+html.mh-theme-dark .assessment-question-title b,
+html.mh-theme-dark .status-pending,
+html.mh-theme-dark .metric-card-gold strong,
+html.mh-theme-dark .audit-count,
+html.mh-theme-dark .history-score,
+html.mh-theme-dark .gentle-reminder-icon,
+html.mh-theme-dark .gentle-reminder-hotline {
+  color: #d9b878;
 }
