@@ -1261,7 +1261,7 @@ main.settings-layout > header {
   gap: 18px;
   padding: 30px;
   border: 1px solid #e0e9e3;
-  border-top: 3px solid #dba95d;
+  border-top: 3px solid #2f7d63;
   border-radius: 9px;
   background: #fff;
 }
@@ -2483,7 +2483,7 @@ main.settings-layout > header {
 
 .question-form {
   margin-top: 4px;
-  border-top: 3px solid #dba95d;
+  border-top: 3px solid #2f7d63;
 }
 
 .question-form-heading, .question-editor-head, .option-editor-head {
@@ -2644,7 +2644,8 @@ main.settings-layout > header {
   display: grid;
   gap: 9px;
   padding: 12px;
-  border-left: 3px solid #dba95d;
+  /* 外层题目卡已经有 4px 绿框，这里再用浓绿会重复强调，改用淡线做内部分组 */
+  border-left: 3px solid #cfe0d3;
   background: #fff;
 }
 
@@ -2709,7 +2710,7 @@ main.settings-layout > header {
 }
 
 .diary-composer {
-  border-top: 3px solid #dba95d;
+  border-top: 3px solid #2f7d63;
 }
 
 .diary-composer-head, .diary-section-head, .diary-entry-meta, .diary-actions {
@@ -5433,4 +5434,17 @@ html.mh-theme-dark .article-rich a {
 
 html.mh-theme-dark .article-rich hr {
   border-top-color: #2d4142;
+}
+
+/* ---- 结构线统一为绿色（暗色） ----
+   金色的 #dba95d 被拿来画 3px 结构线时会被读成另一种主色，
+   这里把三条顶边统一成暗色下的亮绿，内部选项区降成中性线。 */
+html.mh-theme-dark .question-form,
+html.mh-theme-dark .article-detail,
+html.mh-theme-dark .diary-composer {
+  border-top-color: #2c9b78;
+}
+
+html.mh-theme-dark .option-editor {
+  border-left-color: #2d4142;
 }
