@@ -2512,6 +2512,90 @@ main.settings-layout > header {
   border-radius: 6px 6px 0 0;
 }
 
+/* 统一选项条：一次填好四个同构选项，新增题目直接套用，也能一键刷到已有单选题 */
+.bulk-options-bar {
+  padding: 14px 16px;
+  border: 1px dashed #cfe0d3;
+  border-radius: 8px;
+  background: #fbfdfb;
+}
+
+.bulk-options-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  color: #285858;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.bulk-options-row {
+  /* 每组「名称 + 分值」占一列，避免名称一行、分值另一行对不上号 */
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(126px, 1fr));
+  gap: 10px 18px;
+  margin-top: 10px;
+}
+
+.bulk-options-bar .bulk-options-row label {
+  /* 特异性要高于后面的 .management-form label { display:grid }，否则两个输入又被拆成上下两行 */
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.bulk-options-row input {
+  /* basis 用 0 而不是 auto：auto 会按输入框固有宽度（约 170px）撑破网格列，四组排不进一行 */
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.bulk-options-row input[type='number'] {
+  width: 58px;
+  flex: 0 0 auto;
+}
+
+.bulk-options-hint {
+  margin-top: 8px;
+  color: #779087;
+  font-size: 12px;
+}
+
+/* 选项区折叠：20 道同构题若有 4 行输入框，整页会拖到几百行 */
+.option-editor-details {
+  border-top: 1px dashed #e6efe9;
+  padding-top: 10px;
+}
+
+.option-editor-details > summary {
+  padding: 4px 0;
+  color: #4d6a60;
+  font-size: 13px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.option-editor-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.option-editor-details > summary::before {
+  content: "▸";
+  display: inline-block;
+  width: 14px;
+  color: #9ec3b2;
+}
+
+.option-editor-details[open] > summary {
+  margin-bottom: 8px;
+}
+
+.option-editor-details[open] > summary::before {
+  content: "▾";
+}
+
 .question-empty {
   margin: 0;
 }
@@ -5177,4 +5261,30 @@ html.mh-theme-dark .profile-trigger[aria-expanded='true'] {
 html.mh-theme-dark .avatar {
   background: #2c9b78;
   color: #0e1618;
+}
+
+/* 统一选项条与折叠摘要的暗色适配 */
+html.mh-theme-dark .bulk-options-bar {
+  background: #1a2726;
+  border-color: #2d4142;
+}
+
+html.mh-theme-dark .bulk-options-head {
+  color: #e2eeea;
+}
+
+html.mh-theme-dark .bulk-options-hint {
+  color: #7d918c;
+}
+
+html.mh-theme-dark .option-editor-details {
+  border-top-color: #2d4142;
+}
+
+html.mh-theme-dark .option-editor-details > summary {
+  color: #9db2ad;
+}
+
+html.mh-theme-dark .option-editor-details > summary::before {
+  color: #2c9b78;
 }

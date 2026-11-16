@@ -24,6 +24,13 @@ const questionScaleId = ref(null);
 const questionForm = ref([]);
 /** 进入编辑器时的表单快照，用于判断取消时是否存在未保存的修改。 */
 const questionFormSnapshot = ref('');
+/** 顶部「统一选项」条：新增题目直接套用，也可一键刷到全部单选题。 */
+const bulkOptions = ref([
+  { label: '从不', score: 0 },
+  { label: '偶尔', score: 1 },
+  { label: '经常', score: 2 },
+  { label: '几乎每天', score: 3 },
+]);
 const viewingScale = ref(null);
 const viewQuestions = ref([]);
 const viewLoading = ref(false);
@@ -728,12 +735,56 @@ function addQuestion() {
     order: questionForm.value.length + 1,
     content: '',
     type: 'SINGLE',
-    options: [
-      { label: '', score: 0 },
-      { label: '', score: 0 },
-    ],
+    // 直接带上顶部的统一选项，新增题目后只需填题干
+    options: bulkOptions.value.map((option) => ({
+      label: option.label.trim(),
+      score: Number(option.score) || 0,
+    })),
     matrixRows: '',
     matrixColumns: '',
+  });
+}
+
+/** 折叠状态下的选项摘要，例如「从不 / 偶尔 / 经常（0/1/2 分）」。 */
+function optionSummary(question) {
+  const options = (question.options || []).filter((option) => option.label.trim());
+  if (!options.length) {
+    return '未设置选项，点击展开填写';
+  }
+  const labels = options.map((option) => option.label).join(' / ');
+  const scores = options.map((option) => (Number(option.score) || 0)).join('/');
+  return `${labels}（${scores} 分）`;
+}
+
+/** 把统一选项刷到所有单选题，覆盖前先确认。 */
+function applyBulkOptions() {
+  if (bulkOptions.value.some((option) => !option.label.trim())) {
+    setError('统一选项的名称不能为空');
+    return;
+  }
+  const singles = questionForm.value.filter((question) => question.type === 'SINGLE');
+  if (!singles.length) {
+    setError('当前没有单选题，无法应用统一选项');
+    return;
+  }
+  askConfirm({
+    title: '应用统一选项',
+    message: `将覆盖 ${singles.length} 道单选题的选项与分值，已经单独改过的选项会被替换。确定应用吗？`,
+    confirmText: '应用到单选题',
+    errorMessage: '应用统一选项失败',
+    action: () => {
+      singles.forEach((question) => {
+        question.options = bulkOptions.value.map((option) => ({
+          label: option.label.trim(),
+          score: Number(option.score) || 0,
+        }));
+      });
+      // 展开中的选项区收起，避免看起来「没生效」
+      document.querySelectorAll('.option-editor-details').forEach((item) => {
+        item.open = false;
+      });
+      setError('');
+    },
   });
 }
 
@@ -1052,6 +1103,23 @@ onBeforeUnmount(() => {
           </div>
           <button class="secondary" type="button" @click="addQuestion">添加题目</button>
         </div>
+        <div class="bulk-options-bar">
+          <div class="bulk-options-head">
+            <span>统一选项</span>
+            <button class="text-button" type="button" @click="applyBulkOptions">
+              应用到所有单选题
+            </button>
+          </div>
+          <div class="bulk-options-row">
+            <label v-for="(option, optionIndex) in bulkOptions" :key="optionIndex">
+              <input v-model="option.label" maxlength="500" placeholder="选项名称" />
+              <input v-model.number="option.score" type="number" min="0" placeholder="分值" />
+            </label>
+          </div>
+          <p class="bulk-options-hint">
+            新增题目会直接套用这四个选项；已录入的单选题点右侧按钮一键覆盖。
+          </p>
+        </div>
         <div v-if="!questionForm.length" class="empty-state question-empty">
           暂无题目，请点击“添加题目”。
         </div>
@@ -1087,32 +1155,34 @@ onBeforeUnmount(() => {
               </label>
               <p class="matrix-hint">矩阵列会自动转换为选项，请直接编辑矩阵列内容</p>
             </div>
-            <div v-if="question.type !== 'MATRIX'" class="option-editor-head">
-              <span>{{ question.type === 'MULTIPLE' ? '选项' : '选项与分值' }}</span>
-              <button class="text-button" type="button" @click="addOption(question)">添加选项</button>
-            </div>
-            <div
-              v-if="question.type !== 'MATRIX'"
-              v-for="(option, optionIndex) in question.options"
-              :key="optionIndex"
-              class="option-editor-row"
-            >
-              <input v-model="option.label" maxlength="500" placeholder="选项内容" />
-              <input
-                v-if="question.type !== 'MULTIPLE'"
-                v-model.number="option.score"
-                type="number"
-                min="0"
-                placeholder="分值"
-              />
-              <button
-                class="text-button danger-button"
-                type="button"
-                @click="removeOption(question, optionIndex)"
+            <details v-if="question.type !== 'MATRIX'" class="option-editor-details">
+              <summary>{{ optionSummary(question) }}</summary>
+              <div class="option-editor-head">
+                <span>{{ question.type === 'MULTIPLE' ? '选项' : '选项与分值' }}</span>
+                <button class="text-button" type="button" @click="addOption(question)">添加选项</button>
+              </div>
+              <div
+                v-for="(option, optionIndex) in question.options"
+                :key="optionIndex"
+                class="option-editor-row"
               >
-                删除
-              </button>
-            </div>
+                <input v-model="option.label" maxlength="500" placeholder="选项内容" />
+                <input
+                  v-if="question.type !== 'MULTIPLE'"
+                  v-model.number="option.score"
+                  type="number"
+                  min="0"
+                  placeholder="分值"
+                />
+                <button
+                  class="text-button danger-button"
+                  type="button"
+                  @click="removeOption(question, optionIndex)"
+                >
+                  删除
+                </button>
+              </div>
+            </details>
           </div>
           <p v-else class="question-type-hint">文字题由用户直接填写，不参与自动计分。</p>
         </article>
