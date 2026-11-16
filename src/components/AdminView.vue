@@ -22,6 +22,8 @@ const scaleForm = ref({ name: '', description: '', applicableScene: '' });
 const editingScaleId = ref(null);
 const questionScaleId = ref(null);
 const questionForm = ref([]);
+/** 进入编辑器时的表单快照，用于判断取消时是否存在未保存的修改。 */
+const questionFormSnapshot = ref('');
 const viewingScale = ref(null);
 const viewQuestions = ref([]);
 const viewLoading = ref(false);
@@ -310,6 +312,19 @@ const QUESTION_TYPE_LABELS = {
 
 function questionTypeLabel(type) {
   return QUESTION_TYPE_LABELS[type] || '题目';
+}
+
+/** 矩阵列头：以真实选项为准（matrixColumns 只是录入时的原始文本，可能为空）。 */
+function matrixColumnLabels(question) {
+  return (question.options || []).map((option) => option.label).filter(Boolean);
+}
+
+/** 矩阵行：matrixRows 以 \n 分隔，逐行渲染成表格的行标题。 */
+function matrixRowLabels(question) {
+  return (question.matrixRows || '')
+    .split('\n')
+    .map((row) => row.trim())
+    .filter(Boolean);
 }
 
 /** 只读查看问卷内容，不提供任何修改入口。 */
@@ -705,6 +720,7 @@ async function editQuestions(scale) {
       matrixRows: question.matrixRows || '',
       matrixColumns: question.matrixColumns || '',
     }));
+  questionFormSnapshot.value = JSON.stringify(questionForm.value);
 }
 
 function addQuestion() {
@@ -783,7 +799,7 @@ function updateMatrixOptions(question) {
     const existingOption = question.options[index];
     return {
       label: label.trim(),
-      score: existingOption ? (Number(existingOption.score) || index) : index,
+      score: existingOption ? (Number(existingOption.score) || 0) : 0,
     };
   });
 }
@@ -802,9 +818,26 @@ function removeOption(question, optionIndex) {
   question.options.splice(optionIndex, 1);
 }
 
-function cancelQuestions() {
+/** 关闭题目编辑器并丢弃编辑态，调用方负责先做过变动确认。 */
+function resetQuestionEditor() {
   questionScaleId.value = null;
   questionForm.value = [];
+  questionFormSnapshot.value = '';
+}
+
+function cancelQuestions() {
+  const hasChanges = JSON.stringify(questionForm.value) !== questionFormSnapshot.value;
+  if (!hasChanges) {
+    resetQuestionEditor();
+    return;
+  }
+  askConfirm({
+    title: '放弃未保存的修改',
+    message: '题目有修改尚未保存，取消后这些修改不会保留。确定要放弃吗？',
+    confirmText: '放弃修改',
+    errorMessage: '取消编辑失败',
+    action: () => resetQuestionEditor(),
+  });
 }
 
 async function saveQuestions() {
@@ -835,16 +868,16 @@ async function saveQuestions() {
         const existingOption = question.options[index];
         return {
           label: label.trim(),
-          score: existingOption ? (Number(existingOption.score) || 0) : index,
+          score: existingOption ? (Number(existingOption.score) || 0) : 0,
         };
       });
     } else {
-      // 其他题型使用用户编辑的选项
+      // 其他题型使用用户编辑的选项；多选不计分，分值恒为 0
       finalOptions = question.options
         .filter((option) => option.label.trim())
         .map((option) => ({
           label: option.label.trim(),
-          score: Number(option.score) || 0,
+          score: question.type === 'MULTIPLE' ? 0 : (Number(option.score) || 0),
         }));
     }
 
@@ -859,8 +892,7 @@ async function saveQuestions() {
   });
 
   await adminApi.updateQuestions(questionScaleId.value, questions);
-  questionScaleId.value = null;
-  questionForm.value = [];
+  resetQuestionEditor();
 }
 
 async function renderOverviewChart() {
@@ -1056,7 +1088,7 @@ onBeforeUnmount(() => {
               <p class="matrix-hint">矩阵列会自动转换为选项，请直接编辑矩阵列内容</p>
             </div>
             <div v-if="question.type !== 'MATRIX'" class="option-editor-head">
-              <span>选项与分值</span>
+              <span>{{ question.type === 'MULTIPLE' ? '选项' : '选项与分值' }}</span>
               <button class="text-button" type="button" @click="addOption(question)">添加选项</button>
             </div>
             <div
@@ -1066,7 +1098,13 @@ onBeforeUnmount(() => {
               class="option-editor-row"
             >
               <input v-model="option.label" maxlength="500" placeholder="选项内容" />
-              <input v-model.number="option.score" type="number" min="0" placeholder="分值" />
+              <input
+                v-if="question.type !== 'MULTIPLE'"
+                v-model.number="option.score"
+                type="number"
+                min="0"
+                placeholder="分值"
+              />
               <button
                 class="text-button danger-button"
                 type="button"
@@ -1658,18 +1696,45 @@ onBeforeUnmount(() => {
               <em>{{ questionTypeLabel(question.type) }}</em>
             </div>
           </div>
-          <ul v-if="question.options?.length" class="scale-view-options">
+          <ul
+            v-if="question.options?.length && question.type !== 'MATRIX'"
+            class="scale-view-options"
+          >
             <li v-for="option in question.options" :key="option.id">
               <span>{{ option.label }}</span>
-              <small>{{ option.score }} 分</small>
+              <small v-if="question.type !== 'MULTIPLE'">{{ option.score }} 分</small>
             </li>
           </ul>
-          <p
-            v-if="question.type === 'MATRIX' && question.matrixRows"
+          <div
+            v-else-if="question.type === 'MATRIX' && matrixRowLabels(question).length"
             class="scale-view-matrix"
           >
-            矩阵行：{{ question.matrixRows.split('\n').filter(Boolean).join('、') }}
-          </p>
+            <table class="scale-view-matrix-grid">
+              <thead>
+                <tr>
+                  <th class="scale-view-matrix-corner" scope="col"></th>
+                  <th
+                    v-for="(column, columnIndex) in matrixColumnLabels(question)"
+                    :key="columnIndex"
+                    scope="col"
+                  >
+                    {{ column }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, rowIndex) in matrixRowLabels(question)" :key="rowIndex">
+                  <th scope="row">{{ row }}</th>
+                  <td
+                    v-for="(column, columnIndex) in matrixColumnLabels(question)"
+                    :key="columnIndex"
+                  >
+                    <span class="scale-view-matrix-dot" aria-hidden="true"></span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </li>
       </ol>
       <footer class="scale-view-foot">此处仅预览问卷内容，不支持在预览中修改。</footer>

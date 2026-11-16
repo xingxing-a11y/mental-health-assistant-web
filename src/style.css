@@ -1668,11 +1668,54 @@ main.settings-layout > header {
   font-variant-numeric: tabular-nums;
 }
 
+/* 矩阵题：列头是刻度、行是被评对象，必须按表格渲染，不能当选项列表 */
 .scale-view-matrix {
   margin: 0;
   padding-left: 42px;
   color: #779087;
   font-size: 12px;
+  overflow-x: auto;
+}
+
+.scale-view-matrix-grid {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.scale-view-matrix-grid th,
+.scale-view-matrix-grid td {
+  padding: 7px 6px;
+  font-weight: 400;
+  text-align: center;
+}
+
+.scale-view-matrix-grid thead th {
+  color: #779087;
+  font-size: 11px;
+  white-space: nowrap;
+  border-bottom: 1px dashed #dce7df;
+}
+
+.scale-view-matrix-grid tbody th {
+  color: #4d6a60;
+  font-size: 12px;
+  font-weight: 400;
+  text-align: left;
+}
+
+/* 只给行与行之间画线，末行天然没有下边框 */
+.scale-view-matrix-grid tbody tr + tr th,
+.scale-view-matrix-grid tbody tr + tr td {
+  border-top: 1px dashed #dce7df;
+}
+
+.scale-view-matrix-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #b9cdbf;
+  border-radius: 50%;
+  vertical-align: middle;
 }
 
 .scale-view-foot {
@@ -2454,6 +2497,19 @@ main.settings-layout > header {
   margin-top: 5px;
   color: #779087;
   font-size: 13px;
+}
+
+/* 编辑题目时表头吸顶，长表单滚动后「添加题目」入口不消失。
+   负 margin 抵消 .management-form 的 22px 内边距，让白底铺满卡片宽度。 */
+.question-form-heading {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin: -22px -22px 0;
+  padding: 18px 22px 14px;
+  background: #fff;
+  border-bottom: 1px solid #e6efe9;
+  border-radius: 6px 6px 0 0;
 }
 
 .question-empty {
@@ -4766,6 +4822,29 @@ html.mh-theme-dark .scale-view-options small {
 
 html.mh-theme-dark .scale-view-matrix {
   color: #7e8886;
+}
+
+html.mh-theme-dark .scale-view-matrix-grid thead th,
+html.mh-theme-dark .scale-view-matrix-grid tbody tr + tr th,
+html.mh-theme-dark .scale-view-matrix-grid tbody tr + tr td {
+  border-color: #47545b;
+}
+
+html.mh-theme-dark .scale-view-matrix-grid thead th {
+  color: #7e8886;
+}
+
+html.mh-theme-dark .scale-view-matrix-grid tbody th {
+  color: #a2abaa;
+}
+
+html.mh-theme-dark .scale-view-matrix-dot {
+  border-color: #47545b;
+}
+
+html.mh-theme-dark .question-form-heading {
+  background: #161b1e;
+  border-bottom-color: #313b41;
 }
 
 html.mh-theme-dark .scale-view-foot {
