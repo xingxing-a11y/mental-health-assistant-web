@@ -5081,3 +5081,80 @@ html.mh-theme-dark .announcement-detail-content,
 html.mh-theme-dark .analysis-modal-content {
   color: #c9dcd5;
 }
+
+/* ---- 暗色主题：白底容器补底色 ----
+   这些卡片在亮色主题里是 #fff，暗色块此前只提亮了里面的文字、没改底色，
+   结果变成白底白字。普通卡片统一走卡片色，暖色/蓝色强调块保留色相只压暗明度。 */
+html.mh-theme-dark .article-detail,
+html.mh-theme-dark .announcement-card,
+html.mh-theme-dark .archived-session-item,
+html.mh-theme-dark .assessment-question,
+html.mh-theme-dark .assessment-option,
+html.mh-theme-dark .diary-search-result,
+html.mh-theme-dark .option-editor,
+html.mh-theme-dark .profile-menu,
+html.mh-theme-dark .session-menu,
+html.mh-theme-dark .admin-row {
+  background: #192627;
+  border-color: #2d4142;
+}
+
+/* 文章详情顶部保留品牌金描边 */
+html.mh-theme-dark .article-detail {
+  border-top-color: #dba95d;
+}
+
+html.mh-theme-dark .assessment-ai-analysis,
+html.mh-theme-dark .metric-card-gold {
+  background: #2a2418;
+  border-color: #3d3524;
+}
+
+html.mh-theme-dark .metric-card-blue {
+  background: #18242a;
+  border-color: #273a44;
+}
+
+html.mh-theme-dark .auth-page {
+  background: #0e1618;
+}
+
+/* 白色/近白容器：搜索框、表格行、头像底、分割线 */
+html.mh-theme-dark .article-search-wrap,
+html.mh-theme-dark .extras-search,
+html.mh-theme-dark .matrix-row,
+html.mh-theme-dark .admin-row,
+html.mh-theme-dark .avatar,
+html.mh-theme-dark .chat-divider {
+  background: #192627;
+  border-color: #2d4142;
+}
+
+/* 米色强调块：AI 分析、公告正文、题号徽章、状态标签 */
+html.mh-theme-dark .announcement-detail-content,
+html.mh-theme-dark .analysis-modal-content,
+html.mh-theme-dark .favorite-item,
+html.mh-theme-dark .notice,
+html.mh-theme-dark .status-pending,
+html.mh-theme-dark .gentle-reminder-icon,
+html.mh-theme-dark .assessment-question-title b,
+html.mh-theme-dark .assessment-question-missing .assessment-question-title b {
+  background: #2a2418;
+  border-color: #3d3524;
+}
+
+/* 浅绿块：次级按钮、成功标签、设置图标、呼吸圆 */
+html.mh-theme-dark .secondary,
+html.mh-theme-dark .status-success,
+html.mh-theme-dark .settings-option-icon,
+html.mh-theme-dark .diary-entry-meta strong,
+html.mh-theme-dark .session-menu-trigger[aria-expanded='true'],
+html.mh-theme-dark .breath-circle,
+html.mh-theme-dark .meditation-card.playing {
+  background: #1b2b28;
+  border-color: #2d4142;
+}
+
+html.mh-theme-dark .breath-circle.active {
+  background: #243a36;
+}
