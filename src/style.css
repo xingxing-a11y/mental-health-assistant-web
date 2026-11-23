@@ -20,6 +20,18 @@ button, input, textarea, select {
   font: inherit;
 }
 
+/* textarea 的浏览器默认值是 resize: both，用户能把输入框横向拖出卡片
+   （管理后台的通知推送、公告、知识库表单都踩过：内容框拖宽后直接盖住卡片右侧留白）。
+
+   真正止血的是 resize: vertical —— 它让用户拖不出横向尺寸，问题从源头消失。
+   max-width 只能兜住普通块级容器：一旦外层是 grid/flex 且 textarea 带着 inline width，
+   包含块会被内容撑开（实测 label 688px 时 max-width:100% 仍渲染成 900px），所以不能只靠它。
+   需要固定尺寸的场景（如聊天输入框）用更具体的选择器覆盖成 resize: none。 */
+textarea {
+  resize: vertical;
+  max-width: 100%;
+}
+
 button {
   cursor: pointer;
   border: 0;
