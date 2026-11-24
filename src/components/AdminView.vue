@@ -607,9 +607,11 @@ async function renderRiskChart() {
   const sources = ['CHAT_HIGH', 'ASSESSMENT_HIGH', 'DIARY_STREAK'];
   const totals = new Map(riskStats.value.map((row) => [`${row.statDate}|${row.source}`, row.total]));
 
+  // 三条来源要一眼分得开：深绿 / 琥珀 / 冷蓝。
+  // 原来第三条是 #6f9f91（浅灰绿），和深绿同属绿色系、只靠明度区分，浅色背景上几乎看不出差别。
   riskChartInstance.setOption({
     animationDuration: 450,
-    color: ['#2f6b58', '#dba95d', '#6f9f91'],
+    color: ['#2f6b58', '#dba95d', '#5b7fa6'],
     tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
     legend: { top: 0, textStyle: { color: '#668078' } },
     grid: { top: 36, right: 16, bottom: 28, left: 36 },
