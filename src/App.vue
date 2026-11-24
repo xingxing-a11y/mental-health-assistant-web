@@ -39,6 +39,7 @@ const sessionDrawerOpen = ref(false);
 const profileMenuOpen = ref(false);
 const announcementModalOpen = ref(false);
 const selectedAnnouncement = ref(null);
+const selectedNotification = ref(null);
 const announcementReadIds = ref(new Set());
 let announcementPollingId;
 const disclaimerVisible = ref(false);
@@ -382,6 +383,7 @@ function toggleAnnouncementModal() {
 function closeAnnouncementModal() {
   announcementModalOpen.value = false;
   selectedAnnouncement.value = null;
+  selectedNotification.value = null;
 }
 
 function openAnnouncementDetail(announcement) {
@@ -1080,6 +1082,23 @@ async function markNotificationRead(notification) {
   }
 }
 
+/** 打开通知详情：顺手标记已读，和公告的交互保持一致。 */
+function openNotificationDetail(notification) {
+  markNotificationRead(notification);
+  selectedNotification.value = notification;
+}
+
+function closeNotificationDetail() {
+  selectedNotification.value = null;
+}
+
+function handleNotificationCardKeydown(event, notification) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    openNotificationDetail(notification);
+  }
+}
+
 async function markAllNotificationsRead() {
   try {
     await notificationApi.markAllRead();
@@ -1507,7 +1526,10 @@ onBeforeUnmount(() => {
               :key="notification.id"
               class="notification-card"
               :class="{ unread: !notification.read }"
-              @click="markNotificationRead(notification)"
+              role="button"
+              tabindex="0"
+              @click="openNotificationDetail(notification)"
+              @keydown="handleNotificationCardKeydown($event, notification)"
             >
               <div class="notification-card-head">
                 <strong>{{ notification.title }}</strong>
@@ -1592,6 +1614,44 @@ onBeforeUnmount(() => {
         </div>
         <div class="announcement-detail-actions">
           <button class="primary-button" type="button" @click="closeAnnouncementDetail">返回公告列表</button>
+        </div>
+      </section>
+    </div>
+    <div
+      v-if="selectedNotification"
+      class="announcement-detail-backdrop"
+      role="presentation"
+      @click.self="closeNotificationDetail"
+    >
+      <section
+        class="announcement-detail-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="notification-detail-title"
+      >
+        <div class="announcement-detail-head">
+          <div>
+            <span class="eyebrow">MESSAGE</span>
+            <h2 id="notification-detail-title">{{ selectedNotification.title }}</h2>
+          </div>
+          <button
+            class="icon"
+            type="button"
+            aria-label="关闭通知详情"
+            title="关闭"
+            @click="closeNotificationDetail"
+          >
+            <X :size="19" />
+          </button>
+        </div>
+        <time class="announcement-detail-time">
+          {{ formatDateTime(selectedNotification.createdAt) }}
+        </time>
+        <div class="announcement-detail-content">
+          <p>{{ selectedNotification.content }}</p>
+        </div>
+        <div class="announcement-detail-actions">
+          <button class="primary-button" type="button" @click="closeNotificationDetail">返回通知列表</button>
         </div>
       </section>
     </div>

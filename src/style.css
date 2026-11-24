@@ -323,6 +323,8 @@ h1 {
 .announcement-modal {
   width: min(720px, 100%);
   max-height: min(720px, calc(100vh - 48px));
+  /* 两个 tab 共用同一个弹窗：给个下限，空公告时才不会塌成一小块、切 tab 时高度跳变 */
+  min-height: min(520px, calc(100vh - 48px));
   display: grid;
   gap: 20px;
   padding: 28px;
@@ -2964,29 +2966,51 @@ main.settings-layout > header {
   letter-spacing: .04em;
 }
 
-/* 高危预警：六列，摘要列吃掉剩余空间并单行省略，避免长文案把表格撑破 */
+/* 高危预警：六列。摘要列吃满剩余空间（原先用 minmax(0,2.4fr) 会被其他列的 min 挤到只剩六个字） */
 .risk-table {
   display: grid;
+  border: 1px solid #e2ebe6;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fcfdfc;
 }
 
 .risk-row {
   display: grid;
-  grid-template-columns:
-    minmax(120px, .9fr) minmax(96px, .7fr) minmax(0, 2.4fr) 84px 84px minmax(88px, .7fr);
-  gap: 12px;
+  grid-template-columns: 152px 96px minmax(0, 1fr) 88px 108px 76px;
+  gap: 14px;
   align-items: center;
-  padding: 12px 0;
-  border-bottom: 1px solid #e0e9e3;
+  padding: 12px 16px;
+  border-bottom: 1px solid #edf3ef;
   color: #59766c;
   font-size: 13px;
 }
 
+.risk-row:last-child {
+  border-bottom: 0;
+}
+
+.risk-table .risk-row:not(.risk-row-head):hover {
+  background: #f3f9f6;
+}
+
 .risk-row-head {
-  padding-top: 0;
-  color: #8aa097;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  background: #f4faf7;
+  color: #7d968d;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: .04em;
+}
+
+/* 状态标签统一宽度，避免「待处理/已联系本人」字数不同导致列左右抖动 */
+.risk-row .status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  white-space: nowrap;
 }
 
 .risk-summary {
@@ -3025,11 +3049,13 @@ main.settings-layout > header {
 /* 处理弹窗：只补布局与文字色，输入框沿用全局暗色覆盖 */
 .risk-handle-modal {
   display: grid;
-  gap: 14px;
+  gap: 16px;
 }
 
 .risk-handle-modal h3 {
   margin: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e8f0ec;
   color: #285858;
   font-size: 18px;
 }
@@ -4107,6 +4133,11 @@ main.settings-layout > header {
   line-height: 1.7;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+  /* 列表里只露两行，完整内容点开详情看；否则长通知会把列表撑得很长 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* ===== 三期：对话页危机提示与温和提醒 ===== */
