@@ -308,6 +308,8 @@ h1 {
   color: #8aa097;
   font-size: 13px;
   text-align: center;
+  /* 在消息中心的 1fr 内容行里垂直居中，避免贴顶留一大片空 */
+  align-self: center;
 }
 
 .announcement-modal-backdrop {
@@ -322,9 +324,11 @@ h1 {
 
 .announcement-modal {
   width: min(720px, 100%);
-  max-height: min(720px, calc(100vh - 48px));
-  /* 两个 tab 共用同一个弹窗：给个下限，空公告时才不会塌成一小块、切 tab 时高度跳变 */
-  min-height: min(520px, calc(100vh - 48px));
+  /* 固定高度而不是 min-height：两个 tab 切来切去完全等高，不会一大一小，
+     也不会因为内容少而底部留一大片空白（多余空间交给内容区的 1fr 行，内容多则内部滚动）。 */
+  height: min(560px, calc(100vh - 48px));
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   display: grid;
   gap: 20px;
   padding: 28px;
@@ -355,7 +359,9 @@ h1 {
 .announcement-modal-list {
   display: grid;
   gap: 12px;
-  max-height: min(500px, calc(100vh - 250px));
+  /* 高度由弹窗的 1fr 行分配，内容多了在这一层滚 */
+  align-content: start;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -4083,6 +4089,10 @@ main.settings-layout > header {
 .notification-list-wrap {
   display: grid;
   gap: 10px;
+  /* 与公告列表一致：吃掉剩余空间，内容多了内部滚动 */
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .notification-list {
