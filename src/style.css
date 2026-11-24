@@ -4096,11 +4096,18 @@ main.settings-layout > header {
 
 .notification-list-wrap {
   display: grid;
+  /* 两行：列表吃剩余空间、分页固定在最底。之前写三行但只有两个子元素，
+     分页被分到 minmax(0,1fr) 行、和列表的溢出部分叠在一起。 */
+  grid-template-rows: minmax(0, 1fr) auto;
   gap: 10px;
-  /* 与公告列表一致：吃掉剩余空间，内容多了内部滚动 */
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+/* 滚动放在列表自己身上：分页属于外层，不会被内容盖住 */
+.notification-list-wrap .notification-list {
   min-height: 0;
   overflow-y: auto;
+  align-content: start;
 }
 
 .notification-list {
