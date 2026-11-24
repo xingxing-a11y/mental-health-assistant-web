@@ -10,6 +10,9 @@ const props = defineProps({
   section: { type: String, default: 'overview' },
 });
 
+/** 向父组件请求切到另一个管理分区（如预警列表 →「通知推送」）。 */
+const emit = defineEmits(['navigate']);
+
 const users = ref([]);
 const userPage = ref({ page: 0, size: 20, total: 0, totalPages: 0 });
 const userKeyword = ref('');
@@ -166,6 +169,9 @@ const riskPage = ref({ page: 0, size: 20, total: 0, totalPages: 0 });
 const riskStats = ref([]);
 const riskChart = ref(null);
 let riskChartInstance;
+
+/** 从预警列表点「发消息」时暂存的目标账号，切到推送分区后填进表单。 */
+const pendingPushAccount = ref('');
 
 /** 来源的展示文案，与后端 RiskAlertEvent.Source 一一对应。 */
 const RISK_SOURCE_LABELS = {
@@ -659,6 +665,15 @@ function openRiskHandleDialog(alert) {
     handleNote: alert.handleNote || '',
     busy: false,
   };
+}
+
+/** 带着账号跳到「通知推送」，管理员不用再手抄一遍账号（抄错就推给错的人）。 */
+function messageRiskAccount(alert) {
+  if (!alert.username) {
+    return;
+  }
+  pendingPushAccount.value = alert.username;
+  emit('navigate', 'push');
 }
 
 function closeRiskHandleDialog() {
@@ -1319,6 +1334,12 @@ watch(
 watch(
   () => props.section,
   (section) => {
+    // 从预警列表点「发消息」带过来的账号，切到推送分区时直接填好表单
+    if (section === 'push' && pendingPushAccount.value) {
+      notificationForm.value.scope = 'USER';
+      notificationForm.value.userId = pendingPushAccount.value;
+      pendingPushAccount.value = '';
+    }
     loadSectionData(section);
   },
 );
@@ -1839,6 +1860,7 @@ onBeforeUnmount(() => {
       <div v-else class="risk-table">
         <div class="risk-row risk-row-head">
           <span>发生时间</span>
+          <span>账号</span>
           <span>来源</span>
           <span>摘要</span>
           <span>投递</span>
@@ -1847,6 +1869,7 @@ onBeforeUnmount(() => {
         </div>
         <div v-for="alert in riskAlerts" :key="alert.id" class="risk-row">
           <time>{{ formatDateTime(alert.occurredAt) }}</time>
+          <span class="risk-account" :title="alert.username || '账号已注销'">{{ alert.username || '—' }}</span>
           <span>{{ RISK_SOURCE_LABELS[alert.source] || alert.source }}</span>
           <span class="risk-summary" :title="alert.summary">{{ alert.summary }}</span>
           <span
@@ -1862,13 +1885,24 @@ onBeforeUnmount(() => {
           >
             {{ alert.archivedAt ? (RISK_HANDLE_LABELS[alert.handleResult] || '已处理') : '待处理' }}
           </span>
-          <button
-            class="text-button"
-            type="button"
-            @click="openRiskHandleDialog(alert)"
-          >
-            {{ alert.archivedAt ? '改结论' : '处理' }}
-          </button>
+          <div class="risk-actions">
+            <button
+              class="text-button"
+              type="button"
+              @click="openRiskHandleDialog(alert)"
+            >
+              {{ alert.archivedAt ? '改结论' : '处理' }}
+            </button>
+            <button
+              class="text-button"
+              type="button"
+              :disabled="!alert.username"
+              :title="alert.username ? `给 ${alert.username} 发站内信` : '账号已注销，无法发送'"
+              @click="messageRiskAccount(alert)"
+            >
+              发消息
+            </button>
+          </div>
         </div>
       </div>
       <div v-if="riskPage.totalPages > 1" class="pagination">

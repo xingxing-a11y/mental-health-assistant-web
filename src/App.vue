@@ -1412,6 +1412,7 @@ onBeforeUnmount(() => {
       <AdminView
         v-else-if="active === 'admin' && profile?.role === 'ADMIN'"
         :section="adminSection"
+        @navigate="selectAdminSection"
       />
       <SettingsView
         v-else-if="active === 'settings'"

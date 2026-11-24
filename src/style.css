@@ -2987,13 +2987,33 @@ main.settings-layout > header {
 
 .risk-row {
   display: grid;
-  grid-template-columns: 152px 96px minmax(0, 1fr) 88px 108px 76px;
+  /* 时间 / 账号 / 来源 / 摘要（吃剩余）/ 投递 / 处理 / 操作 */
+  grid-template-columns: 152px 104px 92px minmax(0, 1fr) 84px 104px 156px;
   gap: 14px;
   align-items: center;
   padding: 12px 16px;
   border-bottom: 1px solid #edf3ef;
   color: #59766c;
   font-size: 13px;
+}
+
+/* 账号可能较长（注册允许 32 位），单行省略，完整值放 title */
+.risk-account {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 操作列两个动作并排，不换行把行高撑开 */
+.risk-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+/* 按钮文字不许折行：列宽不够时要加宽列，而不是把「改结论」拆成两行 */
+.risk-actions .text-button {
+  white-space: nowrap;
 }
 
 .risk-row:last-child {
@@ -4552,17 +4572,21 @@ main.settings-layout > header {
   .audit-row-head {
     display: none;
   }
-  /* 预警表在窄屏退化成两列卡片式：时间与来源并排，摘要换行占满整行 */
+  /* 预警表在窄屏退化成卡片式：字段按顺序换行，摘要占满，操作靠右 */
   .risk-row {
-    grid-template-columns: 1fr auto;
+    display: flex;
+    flex-wrap: wrap;
     gap: 6px 10px;
   }
   .risk-row-head {
     display: none;
   }
   .risk-summary {
-    grid-column: 1 / -1;
+    flex: 1 1 100%;
     white-space: normal;
+  }
+  .risk-actions {
+    margin-left: auto;
   }
   .risk-trend-chart {
     height: 180px;
