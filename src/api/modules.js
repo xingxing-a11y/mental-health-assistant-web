@@ -163,8 +163,8 @@ export const adminApi = {
   operationLogs: (params = {}) => get(`/admin/operation-logs${buildQuery(params)}`),
   riskAlerts: (page = 0, size = 20) => get(`/admin/risk-alerts${buildQuery({ page, size })}`),
   riskAlertStats: (days = 7) => get(`/admin/risk-alerts/stats${buildQuery({ days })}`),
-  /** 归档不传业务字段，但要带空对象：client.put 会 JSON.stringify，undefined 会算出无 body。 */
-  archiveRiskAlert: (id) => put(`/admin/risk-alerts/${id}/archive`, {}),
+  /** 人工处理：必须带处理方式，空对象会被后端 400 拒掉。 */
+  handleRiskAlert: (id, payload) => put(`/admin/risk-alerts/${id}/handle`, payload),
   knowledgeSettings: () => get('/admin/knowledge-settings'),
   updateKnowledgeSettings: (data) => put('/admin/knowledge-settings', data),
 };

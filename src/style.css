@@ -3022,6 +3022,45 @@ main.settings-layout > header {
   font-size: 13px;
 }
 
+/* 处理弹窗：只补布局与文字色，输入框沿用全局暗色覆盖 */
+.risk-handle-modal {
+  display: grid;
+  gap: 14px;
+}
+
+.risk-handle-modal h3 {
+  margin: 0;
+  color: #285858;
+  font-size: 18px;
+}
+
+.risk-handle-summary {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #f3f8f5;
+  color: #59766c;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.risk-handle-field {
+  display: grid;
+  gap: 6px;
+  color: #59766c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.risk-handle-field select,
+.risk-handle-field textarea {
+  padding: 9px 10px;
+  border: 1px solid #d4e1d9;
+  border-radius: 6px;
+  font: inherit;
+  font-weight: 400;
+}
+
 .audit-row span {
   min-width: 0;
   overflow: hidden;
@@ -5117,7 +5156,17 @@ html.mh-theme-dark .risk-trend h3 {
 html.mh-theme-dark .risk-row,
 html.mh-theme-dark .risk-row-head,
 html.mh-theme-dark .risk-done,
-html.mh-theme-dark .risk-trend-empty {
+html.mh-theme-dark .risk-trend-empty,
+html.mh-theme-dark .risk-handle-field {
+  color: #9db2ad;
+}
+
+html.mh-theme-dark .risk-handle-modal h3 {
+  color: #eff8f4;
+}
+
+html.mh-theme-dark .risk-handle-summary {
+  background: #22322c;
   color: #9db2ad;
 }
 

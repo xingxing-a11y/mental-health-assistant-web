@@ -173,6 +173,24 @@ const RISK_SOURCE_LABELS = {
   ASSESSMENT_HIGH: '测评超阈值',
   DIARY_STREAK: '连续负面日记',
 };
+
+/** 处理结论的短文案，用于状态列；未记录方式的旧数据显示「已处理」。 */
+const RISK_HANDLE_LABELS = {
+  CONTACTED: '已联系本人',
+  FAMILY_NOTIFIED: '已通知家属',
+  REFERRED: '已转介机构',
+  OBSERVING: '观察中',
+  FALSE_ALARM: '判定误报',
+};
+
+const riskHandleDialog = ref({
+  visible: false,
+  id: null,
+  summary: '',
+  handleResult: '',
+  handleNote: '',
+  busy: false,
+});
 const notificationForm = ref({ scope: 'ALL', userId: '', title: '', content: '', permanent: false });
 const sensitiveWords = ref([]);
 const sensitiveWordForm = ref({ word: '', level: 'CARE', enabled: true });
@@ -629,17 +647,42 @@ function destroyRiskChart() {
   riskChartInstance = undefined;
 }
 
-function archiveRiskAlert(alert) {
-  askConfirm({
-    title: '标记已处理',
-    message: `确认「${alert.summary}」已经跟进？归档只写处理时间，不删除记录。`,
-    confirmText: '标记已处理',
-    errorMessage: '归档失败',
-    action: async () => {
-      await adminApi.archiveRiskAlert(alert.id);
-      await loadRiskAlerts(riskPage.value.page);
-    },
-  });
+/** 打开处理弹窗；已处理过的会带出上次结论，允许改。 */
+function openRiskHandleDialog(alert) {
+  riskHandleDialog.value = {
+    visible: true,
+    id: alert.id,
+    summary: alert.summary,
+    handleResult: alert.handleResult || '',
+    handleNote: alert.handleNote || '',
+    busy: false,
+  };
+}
+
+function closeRiskHandleDialog() {
+  if (riskHandleDialog.value.busy) {
+    return;
+  }
+  riskHandleDialog.value.visible = false;
+}
+
+async function submitRiskHandle() {
+  if (!riskHandleDialog.value.handleResult) {
+    return;
+  }
+  riskHandleDialog.value.busy = true;
+  try {
+    await adminApi.handleRiskAlert(riskHandleDialog.value.id, {
+      handleResult: riskHandleDialog.value.handleResult,
+      handleNote: riskHandleDialog.value.handleNote,
+    });
+    riskHandleDialog.value.visible = false;
+    await loadRiskAlerts(riskPage.value.page);
+  } catch (requestError) {
+    setError(requestError.message);
+  } finally {
+    riskHandleDialog.value.busy = false;
+  }
 }
 
 async function pushNotification() {
@@ -1798,22 +1841,20 @@ onBeforeUnmount(() => {
           >
             {{ alert.publishStatus === 'SENT' ? '已投递' : '待重投' }}
           </span>
-          <span class="status-chip" :class="alert.archivedAt ? 'status-success' : 'status-pending'">
-            {{ alert.archivedAt ? '已处理' : '待处理' }}
+          <span
+            class="status-chip"
+            :class="alert.archivedAt ? 'status-success' : 'status-pending'"
+            :title="alert.archivedAt ? '处理于 ' + formatDateTime(alert.archivedAt) : '尚未处理'"
+          >
+            {{ alert.archivedAt ? (RISK_HANDLE_LABELS[alert.handleResult] || '已处理') : '待处理' }}
           </span>
           <button
-            v-if="!alert.archivedAt"
             class="text-button"
             type="button"
-            @click="archiveRiskAlert(alert)"
+            @click="openRiskHandleDialog(alert)"
           >
-            标记处理
+            {{ alert.archivedAt ? '改结论' : '处理' }}
           </button>
-          <span
-            v-else
-            class="risk-done"
-            :title="formatDateTime(alert.archivedAt)"
-          >{{ formatDateTime(alert.archivedAt).split(' ')[0] }}</span>
         </div>
       </div>
       <div v-if="riskPage.totalPages > 1" class="pagination">
@@ -1834,6 +1875,39 @@ onBeforeUnmount(() => {
         >
           下一页
         </button>
+      </div>
+
+      <div v-if="riskHandleDialog.visible" class="modal-backdrop" @click.self="closeRiskHandleDialog">
+        <div class="modal risk-handle-modal">
+          <h3>处理预警</h3>
+          <p class="risk-handle-summary">{{ riskHandleDialog.summary }}</p>
+          <label class="risk-handle-field">
+            <span>处理方式</span>
+            <select v-model="riskHandleDialog.handleResult">
+              <option value="">请选择</option>
+              <option value="CONTACTED">已电话联系本人</option>
+              <option value="FAMILY_NOTIFIED">已通知家属或辅导员</option>
+              <option value="REFERRED">已转介专业机构</option>
+              <option value="OBSERVING">暂时观察，尚未介入</option>
+              <option value="FALSE_ALARM">判定为误报</option>
+            </select>
+          </label>
+          <label class="risk-handle-field">
+            <span>处理备注（选填，最多 200 字）</span>
+            <textarea v-model="riskHandleDialog.handleNote" maxlength="200" rows="3" />
+          </label>
+          <div class="confirm-modal-actions">
+            <button class="text-button" type="button" @click="closeRiskHandleDialog">取消</button>
+            <button
+              class="primary-button"
+              type="button"
+              :disabled="riskHandleDialog.busy || !riskHandleDialog.handleResult"
+              @click="submitRiskHandle"
+            >
+              {{ riskHandleDialog.busy ? '提交中…' : '提交' }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
