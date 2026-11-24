@@ -1760,7 +1760,7 @@ onBeforeUnmount(() => {
         </label>
         <label v-if="notificationForm.scope === 'USER'">
           <span>目标用户（用户名或用户 ID）</span>
-          <input v-model="notificationForm.userId" placeholder="例如 uiadmin 或 12" />
+          <input v-model="notificationForm.userId" />
         </label>
         <label>
           <span>标题（最多 200 字）</span>
