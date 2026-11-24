@@ -693,7 +693,7 @@ async function pushNotification() {
   }
   const target = (form.userId || '').trim();
   if (form.scope === 'USER' && !target) {
-    setError('定向推送需要填写目标用户的用户名或用户 ID');
+    setError('定向推送需要填写目标用户的账号或用户 ID');
     return;
   }
 
@@ -704,9 +704,9 @@ async function pushNotification() {
     permanent: form.permanent,
   };
   if (form.scope === 'USER') {
-    // 纯数字当用户 ID，其余当用户名。
+    // 纯数字当用户 ID，其余当账号。
     // 不能无条件 Number()：Number('uiadmin') 是 NaN，JSON 序列化后变 null，
-    // 后端只会回一句「定向推送必须指定用户」，看不出到底是哪里错了。
+    // 后端只回一句「必须指定账号或用户 ID」，看不出到底是哪里错了。
     if (/^\d+$/.test(target)) {
       payload.userId = Number(target);
     } else {
@@ -1759,7 +1759,7 @@ onBeforeUnmount(() => {
           </select>
         </label>
         <label v-if="notificationForm.scope === 'USER'">
-          <span>目标用户（用户名或用户 ID）</span>
+          <span>目标账号</span>
           <input v-model="notificationForm.userId" />
         </label>
         <label>
