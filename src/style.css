@@ -3054,6 +3054,10 @@ main.settings-layout > header {
 
 /* 处理弹窗：只补布局与文字色，输入框沿用全局暗色覆盖 */
 .risk-handle-modal {
+  /* 不给宽度时会被内容撑成竖条（下拉框宽度 ≈ 最长选项宽），像手机屏；
+     这里钉一个桌面比例：宽 480、高约 320，横长竖短。 */
+  width: min(480px, 92vw);
+  max-width: none;
   display: grid;
   gap: 16px;
 }
