@@ -4096,9 +4096,8 @@ main.settings-layout > header {
 
 .notification-list-wrap {
   display: grid;
-  /* 两行：列表吃剩余空间、分页固定在最底。之前写三行但只有两个子元素，
-     分页被分到 minmax(0,1fr) 行、和列表的溢出部分叠在一起。 */
-  grid-template-rows: minmax(0, 1fr) auto;
+  /* 分页已经移到弹窗底栏，这里只剩列表，单行占满 */
+  grid-template-rows: minmax(0, 1fr);
   gap: 10px;
   min-height: 0;
 }

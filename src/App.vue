@@ -1538,7 +1538,11 @@ onBeforeUnmount(() => {
               <p>{{ notification.content }}</p>
             </article>
           </div>
-          <div v-if="notificationTotalPages > 1" class="pagination">
+        </div>
+        <div class="announcement-modal-foot">
+          <!-- 公告页签保留说明文字；通知页签把分页挪到这一栏，替代原来那句提示 -->
+          <span v-if="notificationTab === 'announcement'">仅显示最近 10 天的公告</span>
+          <div v-else-if="notificationTotalPages > 1" class="pagination">
             <button
               class="text-button"
               type="button"
@@ -1557,11 +1561,7 @@ onBeforeUnmount(() => {
               下一页
             </button>
           </div>
-        </div>
-        <div class="announcement-modal-foot">
-          <span>
-            {{ notificationTab === 'announcement' ? '仅显示最近 10 天的公告' : '通知由管理后台推送，过期后自动隐藏' }}
-          </span>
+          <span v-else />
           <div class="announcement-modal-foot-actions">
             <button
               v-if="notificationTab === 'announcement'"
