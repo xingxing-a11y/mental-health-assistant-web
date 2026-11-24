@@ -447,9 +447,12 @@ h1 {
 }
 
 .announcement-detail-modal {
-  width: min(680px, 100%);
-  max-height: min(680px, calc(100vh - 48px));
+  width: min(680px, 92vw);
+  /* 固定尺寸：短通知不会缩成一细条，长通知也不撑破屏幕——多余内容交给正文区滚动。
+     行分配同消息中心：头/时间/正文(吃剩余)/操作栏。 */
+  height: min(520px, calc(100vh - 48px));
   display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
   gap: 16px;
   padding: 28px;
   border: 1px solid #dfe8e2;
@@ -482,7 +485,8 @@ h1 {
 }
 
 .announcement-detail-content {
-  max-height: min(440px, calc(100vh - 230px));
+  /* 高度由弹窗的 1fr 行分配，正文超出就在这一层滚 */
+  min-height: 0;
   overflow-y: auto;
   padding: 20px;
   border-left: 3px solid #dba95d;
