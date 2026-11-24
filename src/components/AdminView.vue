@@ -691,19 +691,31 @@ async function pushNotification() {
     setError('请填写推送标题与内容');
     return;
   }
-  if (form.scope === 'USER' && !form.userId) {
-    setError('定向推送需要填写目标用户 ID');
+  const target = (form.userId || '').trim();
+  if (form.scope === 'USER' && !target) {
+    setError('定向推送需要填写目标用户的用户名或用户 ID');
     return;
   }
 
+  const payload = {
+    scope: form.scope,
+    title: form.title.trim(),
+    content: form.content.trim(),
+    permanent: form.permanent,
+  };
+  if (form.scope === 'USER') {
+    // 纯数字当用户 ID，其余当用户名。
+    // 不能无条件 Number()：Number('uiadmin') 是 NaN，JSON 序列化后变 null，
+    // 后端只会回一句「定向推送必须指定用户」，看不出到底是哪里错了。
+    if (/^\d+$/.test(target)) {
+      payload.userId = Number(target);
+    } else {
+      payload.username = target;
+    }
+  }
+
   try {
-    await adminApi.pushNotification({
-      scope: form.scope,
-      userId: form.scope === 'USER' ? Number(form.userId) : null,
-      title: form.title.trim(),
-      content: form.content.trim(),
-      permanent: form.permanent,
-    });
+    await adminApi.pushNotification(payload);
     notificationForm.value = { scope: 'ALL', userId: '', title: '', content: '', permanent: false };
     await loadNotifications(0);
   } catch (requestError) {
@@ -1747,8 +1759,8 @@ onBeforeUnmount(() => {
           </select>
         </label>
         <label v-if="notificationForm.scope === 'USER'">
-          <span>目标用户 ID</span>
-          <input v-model="notificationForm.userId" inputmode="numeric" />
+          <span>目标用户（用户名或用户 ID）</span>
+          <input v-model="notificationForm.userId" placeholder="例如 uiadmin 或 12" />
         </label>
         <label>
           <span>标题（最多 200 字）</span>
