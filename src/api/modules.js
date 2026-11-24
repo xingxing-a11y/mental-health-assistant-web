@@ -161,6 +161,10 @@ export const adminApi = {
   feedbacks: (page = 0, size = 20, status = '') => get(`/admin/feedbacks${buildQuery({ page, size, status })}`),
   handleFeedback: (id, data) => put(`/admin/feedbacks/${id}`, data),
   operationLogs: (params = {}) => get(`/admin/operation-logs${buildQuery(params)}`),
+  riskAlerts: (page = 0, size = 20) => get(`/admin/risk-alerts${buildQuery({ page, size })}`),
+  riskAlertStats: (days = 7) => get(`/admin/risk-alerts/stats${buildQuery({ days })}`),
+  /** 归档不传业务字段，但要带空对象：client.put 会 JSON.stringify，undefined 会算出无 body。 */
+  archiveRiskAlert: (id) => put(`/admin/risk-alerts/${id}/archive`, {}),
   knowledgeSettings: () => get('/admin/knowledge-settings'),
   updateKnowledgeSettings: (data) => put('/admin/knowledge-settings', data),
 };

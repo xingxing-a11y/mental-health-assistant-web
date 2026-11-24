@@ -160,6 +160,19 @@ let errorTimer = null;
 
 const notifications = ref([]);
 const notificationPage = ref({ page: 0, size: 20, total: 0, totalPages: 0 });
+
+const riskAlerts = ref([]);
+const riskPage = ref({ page: 0, size: 20, total: 0, totalPages: 0 });
+const riskStats = ref([]);
+const riskChart = ref(null);
+let riskChartInstance;
+
+/** 来源的展示文案，与后端 RiskAlertEvent.Source 一一对应。 */
+const RISK_SOURCE_LABELS = {
+  CHAT_HIGH: '对话高危',
+  ASSESSMENT_HIGH: '测评超阈值',
+  DIARY_STREAK: '连续负面日记',
+};
 const notificationForm = ref({ scope: 'ALL', userId: '', title: '', content: '', permanent: false });
 const sensitiveWords = ref([]);
 const sensitiveWordForm = ref({ word: '', level: 'CARE', enabled: true });
@@ -527,6 +540,108 @@ async function loadNotifications(page = 0) {
   }
 }
 
+/** 预警列表：按事件时间倒序，size 上限由后端夹到 50。 */
+async function loadRiskAlerts(page = 0) {
+  try {
+    const result = await adminApi.riskAlerts(page, riskPage.value.size);
+    riskAlerts.value = result.items || [];
+    riskPage.value = result;
+  } catch (requestError) {
+    setError(requestError.message);
+  }
+}
+
+/** 近 7 天趋势：先取数，等列表渲染完再画，否则容器宽度还是 0。 */
+async function loadRiskStats() {
+  try {
+    riskStats.value = (await adminApi.riskAlertStats(7)) || [];
+  } catch (requestError) {
+    setError(requestError.message);
+    return;
+  }
+  await renderRiskChart();
+}
+
+async function renderRiskChart() {
+  await nextTick();
+  if (props.section !== 'risk') {
+    destroyRiskChart();
+    return;
+  }
+  if (!riskChart.value) {
+    return;
+  }
+  if (!riskStats.value.length) {
+    // 没有数据时清空，避免残留上一次的柱子
+    riskChartInstance?.clear();
+    return;
+  }
+
+  if (riskChartInstance && riskChartInstance.getDom() !== riskChart.value) {
+    destroyRiskChart();
+  }
+  if (!riskChartInstance) {
+    riskChartInstance = echarts.init(riskChart.value);
+  }
+
+  // 日期升序 + 来源固定三条：某天没有某个来源时补 0，否则分组柱子会错位到别的日期上。
+  const days = [...new Set(riskStats.value.map((row) => row.statDate))].sort();
+  const sources = ['CHAT_HIGH', 'ASSESSMENT_HIGH', 'DIARY_STREAK'];
+  const totals = new Map(riskStats.value.map((row) => [`${row.statDate}|${row.source}`, row.total]));
+
+  riskChartInstance.setOption({
+    animationDuration: 450,
+    color: ['#2f6b58', '#dba95d', '#6f9f91'],
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    legend: { top: 0, textStyle: { color: '#668078' } },
+    grid: { top: 36, right: 16, bottom: 28, left: 36 },
+    xAxis: {
+      type: 'category',
+      data: days.map((day) => day.slice(5)),
+      axisLine: { lineStyle: { color: '#c8d8d0' } },
+      axisLabel: { color: '#668078' },
+    },
+    yAxis: {
+      type: 'value',
+      minInterval: 1,
+      splitLine: { lineStyle: { color: '#e6eee9' } },
+      axisLabel: { color: '#8aa097' },
+    },
+    series: sources.map((source) => ({
+      name: RISK_SOURCE_LABELS[source],
+      type: 'bar',
+      barMaxWidth: 26,
+      data: days.map((day) => totals.get(`${day}|${source}`) || 0),
+      itemStyle: { borderRadius: [4, 4, 0, 0] },
+    })),
+  }, true);
+}
+
+function resizeRiskChart() {
+  riskChartInstance?.resize();
+}
+
+function destroyRiskChart() {
+  if (!riskChartInstance) {
+    return;
+  }
+  riskChartInstance.dispose();
+  riskChartInstance = undefined;
+}
+
+function archiveRiskAlert(alert) {
+  askConfirm({
+    title: '标记已处理',
+    message: `确认「${alert.summary}」已经跟进？归档只写处理时间，不删除记录。`,
+    confirmText: '标记已处理',
+    errorMessage: '归档失败',
+    action: async () => {
+      await adminApi.archiveRiskAlert(alert.id);
+      await loadRiskAlerts(riskPage.value.page);
+    },
+  });
+}
+
 async function pushNotification() {
   const form = notificationForm.value;
   if (!form.title.trim() || !form.content.trim()) {
@@ -729,6 +844,10 @@ async function loadSectionData(section) {
   }
   if (section === 'knowledge') {
     await loadKnowledgeSettings();
+  }
+  if (section === 'risk') {
+    await loadRiskAlerts(0);
+    await loadRiskStats();
   }
 }
 
@@ -1131,6 +1250,7 @@ onMounted(() => {
   load();
   loadSectionData(props.section);
   window.addEventListener('resize', resizeOverviewChart);
+  window.addEventListener('resize', resizeRiskChart);
 });
 
 watch(
@@ -1148,7 +1268,9 @@ watch(
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', resizeOverviewChart);
+  window.removeEventListener('resize', resizeRiskChart);
   destroyOverviewChart();
+  destroyRiskChart();
   // 清除错误提示的定时器
   if (errorTimer) {
     clearTimeout(errorTimer);
@@ -1632,6 +1754,83 @@ onBeforeUnmount(() => {
           type="button"
           :disabled="notificationPage.page >= notificationPage.totalPages - 1"
           @click="changeNotificationPage(notificationPage.page + 1)"
+        >
+          下一页
+        </button>
+      </div>
+    </div>
+
+    <div v-if="props.section === 'risk'" class="admin-section management-section">
+      <div class="management-heading">
+        <div>
+          <h2>高危预警</h2>
+          <p>
+            对话命中高危词、测评标准分超过阈值、连续多日负面日记都会自动记录；
+            摘要只写事件类型，不保存用户原话。
+          </p>
+        </div>
+        <span class="management-count">{{ riskPage.total || 0 }} 条记录</span>
+      </div>
+
+      <div class="risk-trend">
+        <h3>近 7 天各来源预警数</h3>
+        <div ref="riskChart" class="risk-trend-chart" aria-label="近七天各来源高危预警数量趋势" />
+        <p v-if="!riskStats.length" class="risk-trend-empty">最近 7 天没有预警。</p>
+      </div>
+
+      <div v-if="!riskAlerts.length" class="empty-state">暂无预警记录。</div>
+      <div v-else class="risk-table">
+        <div class="risk-row risk-row-head">
+          <span>发生时间</span>
+          <span>来源</span>
+          <span>摘要</span>
+          <span>投递</span>
+          <span>处理</span>
+          <span>操作</span>
+        </div>
+        <div v-for="alert in riskAlerts" :key="alert.id" class="risk-row">
+          <time>{{ formatDateTime(alert.occurredAt) }}</time>
+          <span>{{ RISK_SOURCE_LABELS[alert.source] || alert.source }}</span>
+          <span class="risk-summary" :title="alert.summary">{{ alert.summary }}</span>
+          <span
+            class="status-chip"
+            :class="alert.publishStatus === 'SENT' ? 'status-success' : 'status-pending'"
+          >
+            {{ alert.publishStatus === 'SENT' ? '已投递' : '待重投' }}
+          </span>
+          <span class="status-chip" :class="alert.archivedAt ? 'status-success' : 'status-pending'">
+            {{ alert.archivedAt ? '已处理' : '待处理' }}
+          </span>
+          <button
+            v-if="!alert.archivedAt"
+            class="text-button"
+            type="button"
+            @click="archiveRiskAlert(alert)"
+          >
+            标记处理
+          </button>
+          <span
+            v-else
+            class="risk-done"
+            :title="formatDateTime(alert.archivedAt)"
+          >{{ formatDateTime(alert.archivedAt).split(' ')[0] }}</span>
+        </div>
+      </div>
+      <div v-if="riskPage.totalPages > 1" class="pagination">
+        <button
+          class="text-button"
+          type="button"
+          :disabled="riskPage.page <= 0"
+          @click="loadRiskAlerts(riskPage.page - 1)"
+        >
+          上一页
+        </button>
+        <span>第 {{ riskPage.page + 1 }} / {{ riskPage.totalPages }} 页</span>
+        <button
+          class="text-button"
+          type="button"
+          :disabled="riskPage.page >= riskPage.totalPages - 1"
+          @click="loadRiskAlerts(riskPage.page + 1)"
         >
           下一页
         </button>
