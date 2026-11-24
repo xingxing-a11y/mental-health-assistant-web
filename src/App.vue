@@ -599,6 +599,44 @@ async function openSession(session) {
   currentSessionId.value = session.id;
   chatMode.value = session.mode || 'COMPANION';
   messages.value = await chatApi.history(session.id);
+  resumePendingReply(session.id);
+}
+
+/**
+ * 服务端生成不再绑定连接：切走只是看不到增量，答案会继续写完并落库。
+ * 切回来时如果那一轮还没结束，这里轮询几次，等回复出现就补上，
+ * 否则用户会看到一个只有提问、没有回答的会话。
+ */
+async function resumePendingReply(sessionId) {
+  const key = String(sessionId);
+  const isPending = () => [...pendingSessions.value].some((id) => String(id) === key);
+  if (!isPending()) {
+    return;
+  }
+
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    if (String(currentSessionId.value) !== key) {
+      return; // 又切到别的会话了，停掉轮询
+    }
+
+    const history = await chatApi.history(sessionId).catch(() => null);
+    if (history) {
+      const last = history[history.length - 1];
+      if (last && last.role === 'ASSISTANT' && last.content) {
+        messages.value = history;
+        return;
+      }
+    }
+    if (!isPending()) {
+      // 这一轮刚结束、但取数取在了落库之前：再拉一次，拿到最终结果
+      const finalHistory = await chatApi.history(sessionId).catch(() => null);
+      if (finalHistory && String(currentSessionId.value) === key) {
+        messages.value = finalHistory;
+      }
+      return;
+    }
+  }
 }
 
 async function createSession() {
